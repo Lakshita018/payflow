@@ -8,8 +8,11 @@ export const ROUTES = {
   REGISTER:     '/register',
   DASHBOARD:    '/dashboard',
   TRANSACTIONS: '/transactions',
+  TRANSACTION_DETAILS: '/transactions/:id',
+  SEND_MONEY:   '/send-money',
   TRANSFER:     '/transfer',
   RECIPIENTS:   '/recipients',
   FAVOURITES:   '/favourites',
+  PROFILE:      '/profile',
   SETTINGS:     '/settings',
 } as const;

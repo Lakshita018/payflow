@@ -18,7 +18,9 @@ import { DashboardLayout } from '@/layouts/DashboardLayout';
 import { LoginPage }        from '@/pages/LoginPage';
 import { RegisterPage }     from '@/pages/RegisterPage';
 import { DashboardPage }    from '@/pages/DashboardPage';
+import { ProfilePage }      from '@/pages/ProfilePage';
 import { TransactionsPage } from '@/pages/TransactionsPage';
+import { TransactionDetailsPage } from '@/pages/TransactionDetailsPage';
 import { TransferPage }     from '@/pages/TransferPage';
 import { RecipientsPage }   from '@/pages/RecipientsPage';
 import { FavouritesPage }   from '@/pages/FavouritesPage';
@@ -47,9 +49,12 @@ export const router = createBrowserRouter([
     children: [
       { path: ROUTES.DASHBOARD,    element: <DashboardPage /> },
       { path: ROUTES.TRANSACTIONS, element: <TransactionsPage /> },
+      { path: ROUTES.TRANSACTION_DETAILS, element: <TransactionDetailsPage /> },
+      { path: ROUTES.SEND_MONEY,   element: <TransferPage /> },
       { path: ROUTES.TRANSFER,     element: <TransferPage /> },
       { path: ROUTES.RECIPIENTS,   element: <RecipientsPage /> },
       { path: ROUTES.FAVOURITES,   element: <FavouritesPage /> },
+      { path: ROUTES.PROFILE,      element: <ProfilePage /> },
       { path: ROUTES.SETTINGS,     element: <SettingsPage /> },
     ],
   },
