@@ -1,0 +1,41 @@
+# ── Build artefacts ───────────────────────────────────────────────────────────
+dist/
+coverage/
+*.tsbuildinfo
+
+# ── Dependencies (re-installed inside the image) ──────────────────────────────
+node_modules/
+
+# ── Environment files (secrets must never enter the image layer) ──────────────
+.env
+.env.*
+!.env.example
+
+# ── Version control ───────────────────────────────────────────────────────────
+.git/
+.gitignore
+
+# ── Logs ─────────────────────────────────────────────────────────────────────
+logs/
+*.log
+
+# ── Editor / OS artefacts ────────────────────────────────────────────────────
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# ── Test files (not needed at runtime) ───────────────────────────────────────
+tests/
+jest.config.js
+jest.setup.ts
+tsconfig.test.json
+
+# ── Lint config (not needed at runtime) ──────────────────────────────────────
+.eslintrc.js
+.eslintignore
+
+# ── Docker files themselves ───────────────────────────────────────────────────
+Dockerfile
+docker-compose.yml
+.dockerignore

@@ -1,0 +1,79 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# CI — PayFlow Auth Service
+#
+# Runs on every push and pull request.
+# Steps (in order):
+#   1. Lint   — ESLint with TypeScript rules
+#   2. Type   — tsc --noEmit
+#   3. Test   — Jest (unit tests, passWithNoTests)
+#
+# npm dependencies are cached by the setup-node action using package-lock.json
+# as the cache key so clean installs only hit the network when lock files change.
+# ──────────────────────────────────────────────────────────────────────────────
+
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  validate:
+    name: Lint · Typecheck · Test
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        # All commands run inside the auth-service package directory.
+        working-directory: services/auth-service
+
+    steps:
+      # ── 1. Checkout ──────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── 2. Set up Node.js ────────────────────────────────────────────────────
+      # Node 22 LTS — matches the version used in the production Dockerfile.
+      # cache: 'npm' + cache-dependency-path instruct setup-node to restore the
+      # ~/.npm cache keyed on the service's package-lock.json, so npm ci skips
+      # the network on cache hits.
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+          cache-dependency-path: services/auth-service/package-lock.json
+
+      # ── 3. Install dependencies ──────────────────────────────────────────────
+      # Plain npm ci — mirrors local development exactly.
+      # No postinstall/prepare hooks are defined in package.json so there is
+      # nothing unsafe to suppress.
+      - name: Install dependencies
+        run: npm ci
+
+      # ── 4. Generate Prisma client ─────────────────────────────────────────────
+      # The generated client (src/generated/prisma) is required by tsc and Jest.
+      # prisma generate reads only the schema file — no live database needed.
+      - name: Generate Prisma client
+        run: npx prisma generate --schema=prisma/schema.prisma
+
+      # ── 5. Lint ───────────────────────────────────────────────────────────────
+      - name: Lint
+        run: npm run lint
+
+      # ── 6. Typecheck ─────────────────────────────────────────────────────────
+      - name: Typecheck
+        run: npm run typecheck
+
+      # ── 7. Test ───────────────────────────────────────────────────────────────
+      - name: Test
+        run: npm test
+        env:
+          # Tests use in-memory mocks — no real DB/Redis/RabbitMQ needed.
+          # These placeholder values satisfy the env schema validator at startup.
+          NODE_ENV: test
+          DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+          REDIS_URL: redis://localhost:6379
+          RABBITMQ_URL: amqp://localhost:5672
+          JWT_ACCESS_SECRET: ci-placeholder-access-secret-min-32-chars
+          JWT_REFRESH_SECRET: ci-placeholder-refresh-secret-min-32-chars

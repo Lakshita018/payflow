@@ -1,0 +1,109 @@
+// PayFlow — Auth Service Prisma Schema
+// Prisma 7.x — generator "prisma-client" with local output path.
+//
+// DATABASE_URL is read from the environment (via prisma.config.ts).
+// Works with both local PostgreSQL (Docker) and Neon serverless Postgres —
+// only the connection string differs; no schema changes required.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── User ───────────────────────────────────────────────────────────────────
+// Stores registered users.
+//
+// Design notes:
+//   • passwordHash     — bcrypt hash stored; plain-text password never persisted.
+//   • refreshTokenHash — bcrypt hash of the current refresh token.
+//                        NULL means no active session (logged out).
+//                        A single hash per user is a deliberate single-session
+//                        design: logging in on a new device overwrites this
+//                        field, invalidating the previous device's refresh token.
+//                        See docs/adr/004-jwt-refresh-tokens-vs-sessions.md.
+//   • updatedAt        — managed by Prisma @updatedAt; no manual bookkeeping.
+model User {
+  id               String   @id @default(uuid())
+  email            String   @unique
+  payflowId        String   @unique
+  passwordHash     String
+  refreshTokenHash String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  wallet              Wallet?
+  sentTransactions    Transaction[] @relation("SentTransactions")
+  receivedTransactions Transaction[] @relation("ReceivedTransactions")
+  favourites          FavouriteContact[] @relation("UserFavourites")
+  favouritedBy        FavouriteContact[] @relation("FavouritedUsers")
+
+  @@map("users")
+}
+
+// ─── Wallet ──────────────────────────────────────────────────────────────────
+// One wallet per user (@@unique userId).
+//
+// Design notes:
+//   • balance    — stored as Decimal (arbitrary-precision) to avoid floating-
+//                  point rounding errors on monetary values. The smallest unit
+//                  is 2 decimal places (cents). Never store negative values;
+//                  the debit service method enforces this before writing.
+//   • updatedAt  — managed by Prisma @updatedAt.
+model Wallet {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  balance   Decimal  @default(0) @db.Decimal(18, 2)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("wallets")
+}
+
+// ─── Transaction ─────────────────────────────────────────────────────────────
+// Records every money transfer between two users.
+//
+// Design notes:
+//   • amount  — Decimal(18,2) mirrors the wallet balance column precision.
+//   • status  — String enum: "COMPLETED" | "FAILED". Only COMPLETED is written
+//               by the service today; FAILED is reserved for future use.
+//   • note    — optional free-text memo, nullable.
+model Transaction {
+  id         String   @id @default(uuid())
+  senderId   String
+  receiverId String
+  amount     Decimal  @db.Decimal(18, 2)
+  status     String   @default("COMPLETED")
+  note       String?
+  createdAt  DateTime @default(now())
+
+  sender   User @relation("SentTransactions",     fields: [senderId],   references: [id], onDelete: Cascade)
+  receiver User @relation("ReceivedTransactions", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@map("transactions")
+}
+
+// ─── FavouriteContact ────────────────────────────────────────────────────────
+// Records which users a given user has marked as favourites.
+//
+// Design notes:
+//   • @@unique([userId, contactUserId]) — prevents duplicate favourites.
+//   • Cascade delete on both FK sides so removing a user also removes their
+//     favourites and any record of them being favourited.
+model FavouriteContact {
+  id            String   @id @default(uuid())
+  userId        String
+  contactUserId String
+  createdAt     DateTime @default(now())
+
+  user        User @relation("UserFavourites",  fields: [userId],        references: [id], onDelete: Cascade)
+  contactUser User @relation("FavouritedUsers", fields: [contactUserId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, contactUserId])
+  @@map("favourite_contacts")
+}
