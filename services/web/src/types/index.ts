@@ -29,7 +29,12 @@ export interface Wallet {
 export interface Transaction {
   id: string;
   amount: string;
-  status: 'COMPLETED' | 'FAILED';
+  /** PENDING | COMPLETED | FAILED */
+  status: string;
+  /** ADD_MONEY | TRANSFER */
+  type: string;
+  /** CREDIT | DEBIT */
+  direction: string;
   note: string | null;
   createdAt: string;
   senderPayflowId: string;

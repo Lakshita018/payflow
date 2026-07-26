@@ -18,6 +18,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { StatusCodes } from 'http-status-codes';
 import { AuthService } from '../services/auth.service';
+import { UnauthorizedError } from '../utils/errors';
 
 export class AuthController {
   constructor(private readonly authService: AuthService) {
@@ -27,6 +28,7 @@ export class AuthController {
     this.login = this.login.bind(this);
     this.refreshToken = this.refreshToken.bind(this);
     this.logout = this.logout.bind(this);
+    this.me = this.me.bind(this);
   }
 
   // ── POST /auth/register ────────────────────────────────────────────────────
@@ -91,6 +93,20 @@ export class AuthController {
         userId: req.body.userId as string,
       });
       res.status(StatusCodes.NO_CONTENT).send();
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  // ── GET /auth/me ───────────────────────────────────────────────────────────
+  // Returns the authenticated user's public profile.
+  // 200 OK  → { id, email, payflowId, createdAt }
+  // 401     → not authenticated
+  async me(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.user) { throw new UnauthorizedError(); }
+      const result = await this.authService.getMe(req.user.id);
+      res.status(StatusCodes.OK).json(result);
     } catch (err) {
       next(err);
     }

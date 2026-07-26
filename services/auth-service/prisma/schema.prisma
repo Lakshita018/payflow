@@ -40,7 +40,12 @@ model Transaction {
   senderId   String
   receiverId String
   amount     Decimal  @db.Decimal(18, 2)
+  /// PENDING | COMPLETED | FAILED
   status     String   @default("COMPLETED")
+  /// ADD_MONEY | TRANSFER
+  type       String   @default("TRANSFER")
+  /// CREDIT | DEBIT
+  direction  String   @default("CREDIT")
   note       String?
   createdAt  DateTime @default(now())
   receiver   User     @relation("ReceivedTransactions", fields: [receiverId], references: [id], onDelete: Cascade)

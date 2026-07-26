@@ -16,7 +16,7 @@
 import { UserRepository } from '../repositories/user.repository';
 import { FavouriteContactRepository } from '../repositories/favourite.repository';
 import { TransactionRepository } from '../repositories/transaction.repository';
-import { NotFoundError, ConflictError } from '../utils/errors';
+import { NotFoundError } from '../utils/errors';
 import { searchQuerySchema } from '../validators/user.validator';
 
 // ---------------------------------------------------------------------------
@@ -126,23 +126,35 @@ export class UserService {
   }
 
   // ── Favourites — add ───────────────────────────────────────────────────────
-  async addFavourite(userId: string, contactUserId: string): Promise<void> {
-    // Verify the contact user exists
-    const contact = await this.userRepository.findById(contactUserId);
+  // Accepts either a UUID (contactUserId) or a PayFlow ID (contactPayflowId).
+  // The frontend may pass a PayFlow ID when the internal UUID is not known.
+  async addFavourite(userId: string, contactIdentifier: string): Promise<void> {
+    // Try by UUID first; fall back to payflowId lookup if UUID not found
+    let contact = await this.userRepository.findById(contactIdentifier);
+    if (contact === null) {
+      // contactIdentifier might be a payflowId — try that
+      contact = await this.userRepository.findByPayflowId(contactIdentifier);
+    }
     if (contact === null) {
       throw new NotFoundError('Contact user not found');
     }
     try {
-      await this.favouriteRepository.create(userId, contactUserId);
+      await this.favouriteRepository.create(userId, contact.id);
     } catch {
-      // P2002 unique constraint — already favourited
-      throw new ConflictError('User is already in your favourites');
+      // P2002 unique constraint — already favourited, treat as success (idempotent)
     }
   }
 
   // ── Favourites — remove ────────────────────────────────────────────────────
-  async removeFavourite(userId: string, contactUserId: string): Promise<void> {
-    await this.favouriteRepository.remove(userId, contactUserId);
+  // Accepts either a UUID or a PayFlow ID.
+  async removeFavourite(userId: string, contactIdentifier: string): Promise<void> {
+    // Try by UUID first; fall back to payflowId lookup
+    let contact = await this.userRepository.findById(contactIdentifier);
+    if (contact === null) {
+      contact = await this.userRepository.findByPayflowId(contactIdentifier);
+    }
+    if (contact === null) return; // already not favourite — idempotent
+    await this.favouriteRepository.remove(userId, contact.id);
     // Silently succeeds even if the favourite did not exist — idempotent DELETE
   }
 

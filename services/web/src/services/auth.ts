@@ -68,3 +68,16 @@ export async function refresh(refreshToken: string): Promise<AuthTokens> {
 export async function logout(userId: string): Promise<void> {
   await apiClient.post('/api/v1/auth/logout', { userId });
 }
+
+export interface MeResponse {
+  id: string;
+  email: string;
+  payflowId: string;
+  createdAt: string;
+}
+
+/** GET /api/v1/auth/me → { id, email, payflowId, createdAt } */
+export async function me(): Promise<MeResponse> {
+  const { data } = await apiClient.get<MeResponse>('/api/v1/auth/me');
+  return data;
+}

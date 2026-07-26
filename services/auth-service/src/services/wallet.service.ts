@@ -3,12 +3,13 @@
 //
 // Layer contract
 // --------------
-// • All DB access goes through WalletRepository — never touches Prisma directly.
+// • All DB access goes through repositories — never touches Prisma directly.
 // • Returns plain output objects; throws typed AppError subclasses.
 // • No Express types, no req/res.
 // ---------------------------------------------------------------------------
 import { Prisma } from '../generated/prisma/client';
 import { WalletRepository } from '../repositories/wallet.repository';
+import { TransactionRepository } from '../repositories/transaction.repository';
 import { ConflictError, NotFoundError, UnprocessableEntityError } from '../utils/errors';
 import { creditSchema, debitSchema } from '../validators/wallet.validator';
 
@@ -28,7 +29,10 @@ export interface WalletResult {
 // WalletService
 // ---------------------------------------------------------------------------
 export class WalletService {
-  constructor(private readonly walletRepository: WalletRepository) {}
+  constructor(
+    private readonly walletRepository: WalletRepository,
+    private readonly transactionRepository?: TransactionRepository,
+  ) {}
 
   // ── Serialise ─────────────────────────────────────────────────────────────
   // Convert the Prisma Decimal to a string before leaving the service layer.
@@ -61,10 +65,12 @@ export class WalletService {
   }
 
   // ── Get balance ───────────────────────────────────────────────────────────
+  // Auto-creates a wallet (₹0) for users who registered before wallet
+  // auto-creation was added, so legacy accounts are never broken.
   async getBalance(userId: string): Promise<WalletResult> {
-    const wallet = await this.walletRepository.findByUserId(userId);
+    let wallet = await this.walletRepository.findByUserId(userId);
     if (wallet === null) {
-      throw new NotFoundError('Wallet not found');
+      wallet = await this.walletRepository.create({ userId });
     }
     return this.toResult(wallet);
   }
@@ -73,14 +79,29 @@ export class WalletService {
   async credit(userId: string, amount: number): Promise<WalletResult> {
     const { amount: validated } = creditSchema.parse({ amount });
 
-    const wallet = await this.walletRepository.findByUserId(userId);
+    let wallet = await this.walletRepository.findByUserId(userId);
     if (wallet === null) {
-      throw new NotFoundError('Wallet not found');
+      // Auto-create wallet for legacy users who registered before auto-creation
+      wallet = await this.walletRepository.create({ userId });
     }
 
     // eslint-disable-next-line @typescript-eslint/no-unsafe-call
     const decimal = new Prisma.Decimal(validated);
     const updated = await this.walletRepository.credit(userId, decimal);
+
+    // Record an ADD_MONEY transaction (sender = receiver = userId, CREDIT direction)
+    if (this.transactionRepository) {
+      await this.transactionRepository.create({
+        senderId: userId,
+        receiverId: userId,
+        amount: decimal,
+        status: 'COMPLETED',
+        type: 'ADD_MONEY',
+        direction: 'CREDIT',
+        note: 'Added to wallet',
+      });
+    }
+
     return this.toResult(updated);
   }
 

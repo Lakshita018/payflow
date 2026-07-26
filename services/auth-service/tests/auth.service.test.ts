@@ -107,7 +107,7 @@ describe('AuthService.register()', () => {
       }),
     );
 
-    expect(result).toEqual({ id: user.id, email: user.email, createdAt: user.createdAt });
+    expect(result).toEqual({ id: user.id, email: user.email, payflowId: user.payflowId, createdAt: user.createdAt });
     // passwordHash must never appear in the result
     expect(result).not.toHaveProperty('passwordHash');
   });

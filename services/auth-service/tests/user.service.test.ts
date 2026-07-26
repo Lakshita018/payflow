@@ -16,7 +16,7 @@ import {
 import { UserRepository } from '../src/repositories/user.repository';
 import { FavouriteContactRepository } from '../src/repositories/favourite.repository';
 import { TransactionRepository } from '../src/repositories/transaction.repository';
-import { NotFoundError, ConflictError } from '../src/utils/errors';
+import { NotFoundError } from '../src/utils/errors';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -144,8 +144,8 @@ describe('UserService.search()', () => {
   it('returns matching users as PublicProfile[]', async () => {
     const userRepo = makeUserRepo();
     userRepo.findManyPublic.mockResolvedValue([
-      { payflowId: 'alice1234@payflow' },
-      { payflowId: 'alan9876@payflow' },
+      { payflowId: 'alice1234@payflow', email: 'alice@example.com' },
+      { payflowId: 'alan9876@payflow',  email: 'alan@example.com' },
     ]);
     const service = makeService(userRepo, makeFavRepo(), makeTxRepo());
 
@@ -157,7 +157,7 @@ describe('UserService.search()', () => {
 
   it('derives displayName from payflowId prefix', async () => {
     const userRepo = makeUserRepo();
-    userRepo.findManyPublic.mockResolvedValue([{ payflowId: 'harsh5678@payflow' }]);
+    userRepo.findManyPublic.mockResolvedValue([{ payflowId: 'harsh5678@payflow', email: 'harsh@example.com' }]);
     const service = makeService(userRepo, makeFavRepo(), makeTxRepo());
 
     const result = await service.search('har', 'user-1');
@@ -177,7 +177,7 @@ describe('UserService.search()', () => {
 
   it('returns empty array when no matches found', async () => {
     const userRepo = makeUserRepo();
-    userRepo.findManyPublic.mockResolvedValue([]);
+    userRepo.findManyPublic.mockResolvedValue([] as never);
     const service = makeService(userRepo, makeFavRepo(), makeTxRepo());
 
     const result = await service.search('zzz', 'user-1');
@@ -187,7 +187,7 @@ describe('UserService.search()', () => {
 
   it('never exposes email in search results', async () => {
     const userRepo = makeUserRepo();
-    userRepo.findManyPublic.mockResolvedValue([{ payflowId: 'bob5678@payflow' }]);
+    userRepo.findManyPublic.mockResolvedValue([{ payflowId: 'bob5678@payflow', email: 'bob@example.com' }]);
     const service = makeService(userRepo, makeFavRepo(), makeTxRepo());
 
     const result = await service.search('bob', 'user-1');
@@ -227,7 +227,7 @@ describe('UserService.getRecentContacts()', () => {
       { contactId: 'user-2', lastInteractionAt: interactionDate, transactionCount: 3 },
     ]);
     userRepo.findPublicByIds.mockResolvedValue([
-      { id: 'user-2', payflowId: 'bob5678@payflow' },
+      { id: 'user-2', payflowId: 'bob5678@payflow', email: 'bob@example.com' },
     ]);
 
     const service = makeService(userRepo, makeFavRepo(), txRepo);
@@ -261,8 +261,8 @@ describe('UserService.getRecentContacts()', () => {
       { contactId: 'user-b', lastInteractionAt: new Date('2024-06-10'), transactionCount: 2 },
     ]);
     userRepo.findPublicByIds.mockResolvedValue([
-      { id: 'user-a', payflowId: 'anna9001@payflow' },
-      { id: 'user-b', payflowId: 'ben4321@payflow' },
+      { id: 'user-a', payflowId: 'anna9001@payflow', email: 'anna@example.com' },
+      { id: 'user-b', payflowId: 'ben4321@payflow',  email: 'ben@example.com'  },
     ]);
 
     const service = makeService(userRepo, makeFavRepo(), txRepo);
@@ -279,15 +279,17 @@ describe('UserService.getRecentContacts()', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('UserService.addFavourite()', () => {
-  it('throws NotFoundError when contact user does not exist', async () => {
+  it('throws NotFoundError when contact user does not exist (neither UUID nor payflowId)', async () => {
     const userRepo = makeUserRepo();
+    // Both findById and findByPayflowId return null
     userRepo.findById.mockResolvedValue(null);
+    userRepo.findByPayflowId.mockResolvedValue(null);
     const service = makeService(userRepo, makeFavRepo(), makeTxRepo());
 
     await expect(service.addFavourite('user-1', 'ghost')).rejects.toBeInstanceOf(NotFoundError);
   });
 
-  it('creates the favourite when contact exists', async () => {
+  it('creates the favourite when contact found by UUID', async () => {
     const userRepo = makeUserRepo();
     const favRepo = makeFavRepo();
     userRepo.findById.mockResolvedValue(makeUser({ id: 'user-2' }));
@@ -301,14 +303,15 @@ describe('UserService.addFavourite()', () => {
     expect(favRepo.create).toHaveBeenCalledWith('user-1', 'user-2');
   });
 
-  it('throws ConflictError when favourite already exists (simulated P2002)', async () => {
+  it('is idempotent — silently succeeds when favourite already exists (P2002)', async () => {
     const userRepo = makeUserRepo();
     const favRepo = makeFavRepo();
     userRepo.findById.mockResolvedValue(makeUser({ id: 'user-2' }));
     favRepo.create.mockRejectedValue(new Error('Unique constraint failed'));
     const service = makeService(userRepo, favRepo, makeTxRepo());
 
-    await expect(service.addFavourite('user-1', 'user-2')).rejects.toBeInstanceOf(ConflictError);
+    // Should NOT throw — idempotent behaviour
+    await expect(service.addFavourite('user-1', 'user-2')).resolves.toBeUndefined();
   });
 });
 
@@ -318,18 +321,23 @@ describe('UserService.addFavourite()', () => {
 
 describe('UserService.removeFavourite()', () => {
   it('calls repository remove and resolves without error', async () => {
+    const userRepo = makeUserRepo();
     const favRepo = makeFavRepo();
+    userRepo.findById.mockResolvedValue(makeUser({ id: 'user-2' }));
     favRepo.remove.mockResolvedValue(null);
-    const service = makeService(makeUserRepo(), favRepo, makeTxRepo());
+    const service = makeService(userRepo, favRepo, makeTxRepo());
 
     await expect(service.removeFavourite('user-1', 'user-2')).resolves.toBeUndefined();
     expect(favRepo.remove).toHaveBeenCalledWith('user-1', 'user-2');
   });
 
-  it('is idempotent — does not throw when favourite did not exist', async () => {
+  it('is idempotent — does not throw when user not found', async () => {
+    const userRepo = makeUserRepo();
     const favRepo = makeFavRepo();
+    userRepo.findById.mockResolvedValue(null);
+    userRepo.findByPayflowId.mockResolvedValue(null);
     favRepo.remove.mockResolvedValue(null);
-    const service = makeService(makeUserRepo(), favRepo, makeTxRepo());
+    const service = makeService(userRepo, favRepo, makeTxRepo());
 
     await expect(service.removeFavourite('user-1', 'nobody')).resolves.toBeUndefined();
   });
@@ -355,8 +363,8 @@ describe('UserService.getFavourites()', () => {
     const userRepo = makeUserRepo();
     favRepo.findContactIdsByUser.mockResolvedValue(['user-2', 'user-3']);
     userRepo.findPublicByIds.mockResolvedValue([
-      { id: 'user-2', payflowId: 'bob5678@payflow' },
-      { id: 'user-3', payflowId: 'carol321@payflow' },
+      { id: 'user-2', payflowId: 'bob5678@payflow',   email: 'bob@example.com'   },
+      { id: 'user-3', payflowId: 'carol321@payflow', email: 'carol@example.com' },
     ]);
     const service = makeService(userRepo, favRepo, makeTxRepo());
 
@@ -373,7 +381,7 @@ describe('UserService.getFavourites()', () => {
     const userRepo = makeUserRepo();
     favRepo.findContactIdsByUser.mockResolvedValue(['user-2']);
     userRepo.findPublicByIds.mockResolvedValue([
-      { id: 'user-2', payflowId: 'bob5678@payflow' },
+      { id: 'user-2', payflowId: 'bob5678@payflow', email: 'bob@example.com' },
     ]);
     const service = makeService(userRepo, favRepo, makeTxRepo());
 

@@ -3,7 +3,7 @@ import type { TransactionItem } from './types';
 
 export interface TransactionRecord extends TransactionItem {
   contactLabel: 'From' | 'To';
-  statusLabel: 'Received' | 'Sent';
+  statusLabel: 'Received' | 'Sent' | 'Added';
   referenceId: string;
   paymentMethod: string;
   amountSign: '+' | '-';

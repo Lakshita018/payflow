@@ -1,30 +1,75 @@
-import { useLocation } from 'react-router-dom';
+import { useState, useRef } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import Avatar from '@/components/ui/Avatar';
 import Input from '@/components/ui/Input';
 import PageHeader from '@/components/ui/PageHeader';
 import { ROUTES } from '@/routes/paths';
+import { useAuthStore } from '@/store';
 import { BellIcon, MenuIcon, SearchIcon } from './icons';
 
 type TopNavigationProps = {
   onMenuClick: () => void;
 };
 
-const pageMeta: Record<string, { title: string; subtitle: string }> = {
-  [ROUTES.DASHBOARD]: { title: 'Good Morning, Liam 👋', subtitle: "Here's what's happening with your account today." },
-  [ROUTES.TRANSACTIONS]: { title: 'Transactions', subtitle: 'View and manage all your payment activity.' },
-  [ROUTES.SEND_MONEY]: { title: 'Send Money', subtitle: 'Move money to a saved contact.' },
-  [ROUTES.TRANSFER]: { title: 'Send Money', subtitle: 'Move money to a saved contact.' },
-  [ROUTES.FAVOURITES]: { title: 'Favourite Contacts', subtitle: 'Quick access to your most important people' },
-  [ROUTES.PROFILE]: { title: 'Profile', subtitle: 'Manage your PayFlow account.' },
-  [ROUTES.SETTINGS]: { title: 'Settings', subtitle: 'Adjust your preferences.' },
+function getGreeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Good Morning';
+  if (hour < 17) return 'Good Afternoon';
+  return 'Good Evening';
+}
+
+const staticPageMeta: Record<string, { subtitle: string }> = {
+  [ROUTES.TRANSACTIONS]: { subtitle: 'View and manage all your payment activity.' },
+  [ROUTES.SEND_MONEY]:   { subtitle: 'Move money to a saved contact.' },
+  [ROUTES.TRANSFER]:     { subtitle: 'Move money to a saved contact.' },
+  [ROUTES.FAVOURITES]:   { subtitle: 'Quick access to your most important people' },
+  [ROUTES.PROFILE]:      { subtitle: 'Manage your PayFlow account.' },
+  [ROUTES.SETTINGS]:     { subtitle: 'Adjust your preferences.' },
+};
+
+const staticPageTitles: Record<string, string> = {
+  [ROUTES.TRANSACTIONS]: 'Transactions',
+  [ROUTES.SEND_MONEY]:   'Send Money',
+  [ROUTES.TRANSFER]:     'Send Money',
+  [ROUTES.FAVOURITES]:   'Favourite Contacts',
+  [ROUTES.PROFILE]:      'Profile',
+  [ROUTES.SETTINGS]:     'Settings',
 };
 
 export function TopNavigation({ onMenuClick }: TopNavigationProps) {
   const { pathname } = useLocation();
-  const isTransactionDetails = pathname.startsWith('/transactions/');
-  const meta = isTransactionDetails
-    ? null
-    : pageMeta[pathname] ?? pageMeta[ROUTES.DASHBOARD];
+  const navigate = useNavigate();
+  const user = useAuthStore((s) => s.user);
+  const displayName = user?.email?.split('@')[0] ?? user?.payflowId?.split('@')[0] ?? 'there';
+  const [searchValue, setSearchValue] = useState('');
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      const q = searchValue.trim();
+      if (!q) return;
+      setSearchValue('');
+      void navigate(ROUTES.SEND_MONEY, { state: { prefillPayflowId: q } });
+    }
+  };
+
+  const isTransactionDetails = pathname.startsWith('/transactions/') && pathname !== ROUTES.TRANSACTIONS;
+
+  let title: string;
+  let subtitle: string;
+
+  if (isTransactionDetails) {
+    title = '';
+    subtitle = '';
+  } else if (pathname === ROUTES.DASHBOARD) {
+    title = `${getGreeting()}, ${displayName} 👋`;
+    subtitle = "Here's what's happening with your account today.";
+  } else {
+    title = staticPageTitles[pathname] ?? '';
+    subtitle = staticPageMeta[pathname]?.subtitle ?? '';
+  }
+
+  const showMeta = !isTransactionDetails && title;
 
   return (
     <header className="sticky top-0 z-20 border-b border-border/70 bg-surface/90 backdrop-blur-xl">
@@ -39,9 +84,9 @@ export function TopNavigation({ onMenuClick }: TopNavigationProps) {
             <MenuIcon className="h-5 w-5" />
           </button>
 
-          {meta ? (
+          {showMeta ? (
             <div className="min-w-0 flex-1">
-              <PageHeader title={meta.title} subtitle={meta.subtitle} />
+              <PageHeader title={title} subtitle={subtitle} />
             </div>
           ) : (
             <div className="hidden min-w-0 flex-1 lg:block" />
@@ -50,10 +95,14 @@ export function TopNavigation({ onMenuClick }: TopNavigationProps) {
           <div className="hidden min-w-0 flex-1 items-center justify-end gap-3 lg:flex xl:flex-[0.95]">
             <div className="w-full max-w-[22rem]">
               <Input
-                aria-label="Search transactions, contacts"
-                placeholder="Search transactions, contacts..."
+                ref={searchRef}
+                aria-label="Search contacts by PayFlow ID"
+                placeholder="Search by PayFlow ID…"
                 leftIcon={<SearchIcon className="h-4 w-4" />}
                 className="h-11 rounded-2xl border-border bg-white px-4 text-sm shadow-sm"
+                value={searchValue}
+                onChange={(e) => setSearchValue(e.target.value)}
+                onKeyDown={handleSearchKeyDown}
               />
             </div>
 
@@ -65,19 +114,22 @@ export function TopNavigation({ onMenuClick }: TopNavigationProps) {
               <BellIcon className="h-5 w-5" />
             </button>
 
-            <Avatar name="Liam Grant" size="md" className="bg-brand-100 text-brand-700 shadow-sm" />
+            <Avatar name={user?.email ?? 'User'} size="md" className="bg-brand-100 text-brand-700 shadow-sm" />
           </div>
         </div>
 
         <div className="mt-4 flex items-center gap-3 lg:hidden">
           <div className="flex-1">
-            <Input
-              aria-label="Search transactions, contacts"
-              placeholder="Search transactions, contacts..."
-              leftIcon={<SearchIcon className="h-4 w-4" />}
-              className="h-11 rounded-2xl border-border bg-white px-4 text-sm shadow-sm"
-            />
-          </div>
+              <Input
+                aria-label="Search contacts by PayFlow ID"
+                placeholder="Search by PayFlow ID…"
+                leftIcon={<SearchIcon className="h-4 w-4" />}
+                className="h-11 rounded-2xl border-border bg-white px-4 text-sm shadow-sm"
+                value={searchValue}
+                onChange={(e) => setSearchValue(e.target.value)}
+                onKeyDown={handleSearchKeyDown}
+              />
+            </div>
 
           <button
             type="button"
@@ -87,7 +139,7 @@ export function TopNavigation({ onMenuClick }: TopNavigationProps) {
             <BellIcon className="h-5 w-5" />
           </button>
 
-          <Avatar name="Liam Grant" size="md" className="bg-brand-100 text-brand-700 shadow-sm" />
+          <Avatar name={user?.email ?? 'User'} size="md" className="bg-brand-100 text-brand-700 shadow-sm" />
         </div>
       </div>
     </header>

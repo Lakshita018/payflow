@@ -128,10 +128,15 @@ describe('WalletService.getBalance()', () => {
     expect(result.userId).toBe('user-1');
   });
 
-  it('throws NotFoundError when wallet does not exist', async () => {
+  it('auto-creates and returns a ₹0 wallet when none exists', async () => {
+    const newWallet = makeWallet('0');
     repo.findByUserId.mockResolvedValue(null);
+    repo.create.mockResolvedValue(newWallet as never);
 
-    await expect(service.getBalance('ghost')).rejects.toBeInstanceOf(NotFoundError);
+    const result = await service.getBalance('ghost');
+
+    expect(repo.create).toHaveBeenCalledWith({ userId: 'ghost' });
+    expect(result.balance).toBe('0');
   });
 });
 
@@ -158,11 +163,18 @@ describe('WalletService.credit()', () => {
     expect(result.balance).toBe('150');
   });
 
-  it('throws NotFoundError when wallet does not exist', async () => {
+  it('auto-creates wallet then credits when none exists', async () => {
+    const newWallet = makeWallet('0');
+    const creditedWallet = makeWallet('10');
     repo.findByUserId.mockResolvedValue(null);
+    repo.create.mockResolvedValue(newWallet as never);
+    repo.credit.mockResolvedValue(creditedWallet as never);
 
-    await expect(service.credit('ghost', 10)).rejects.toBeInstanceOf(NotFoundError);
-    expect(repo.credit).not.toHaveBeenCalled();
+    const result = await service.credit('ghost', 10);
+
+    expect(repo.create).toHaveBeenCalledWith({ userId: 'ghost' });
+    expect(repo.credit).toHaveBeenCalledWith('ghost', expect.anything());
+    expect(result.balance).toBe('10');
   });
 
   it('throws ZodError for zero amount', async () => {

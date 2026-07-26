@@ -27,6 +27,7 @@ import { PrismaClient, User } from '../generated/prisma/client';
 // ---------------------------------------------------------------------------
 export interface PublicUser {
   payflowId: string;
+  email: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -76,11 +77,11 @@ export class UserRepository {
   async findPublicByPayflowId(payflowId: string): Promise<PublicUser | null> {
     return this.db.user.findUnique({
       where: { payflowId },
-      select: { payflowId: true },
+      select: { payflowId: true, email: true },
     });
   }
 
-  // Case-insensitive partial search on payflowId.
+  // Case-insensitive partial search on payflowId OR email prefix.
   // Excludes the requesting user. Returns at most `limit` results.
   findManyPublic(
     query: string,
@@ -90,9 +91,12 @@ export class UserRepository {
     return this.db.user.findMany({
       where: {
         id: { not: excludeUserId },
-        payflowId: { contains: query, mode: 'insensitive' },
+        OR: [
+          { payflowId: { contains: query, mode: 'insensitive' } },
+          { email:      { contains: query, mode: 'insensitive' } },
+        ],
       },
-      select: { payflowId: true },
+      select: { payflowId: true, email: true },
       take: limit,
     });
   }
@@ -101,7 +105,7 @@ export class UserRepository {
   findPublicByIds(ids: string[]): Promise<(PublicUser & { id: string })[]> {
     return this.db.user.findMany({
       where: { id: { in: ids } },
-      select: { id: true, payflowId: true },
+      select: { id: true, payflowId: true, email: true },
     });
   }
 

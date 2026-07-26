@@ -2,28 +2,29 @@
 // Auth routes — wires the HTTP layer for all authentication endpoints.
 //
 // Composition root for the auth feature:
-//   prisma singleton  →  UserRepository  →  AuthService  →  AuthController
+//   prisma singleton  →  UserRepository + WalletRepository  →  AuthService  →  AuthController
 //
-// All four dependencies are instantiated exactly once at module-load time.
+// All dependencies are instantiated exactly once at module-load time.
 // Because Node's module cache keeps this file alive for the process lifetime,
 // there is no risk of double-instantiation.
 //
 // Routes mounted here are prefixed with /api/v1/auth in app.ts.
-//
-// Authentication middleware (JWT verification for protected routes) is added
-// in a later phase. Logout will read userId from req.user once that
-// middleware is in place; for now it reads from req.body.
 // ---------------------------------------------------------------------------
 import { Router } from 'express';
 import { prisma } from '../config/prisma';
 import { UserRepository } from '../repositories/user.repository';
+import { WalletRepository } from '../repositories/wallet.repository';
 import { AuthService } from '../services/auth.service';
 import { AuthController } from '../controllers/auth.controller';
+import { createAuthMiddleware } from '../middlewares/auth.middleware';
 
 // ── Dependency composition ─────────────────────────────────────────────────
-const userRepository = new UserRepository(prisma);
-const authService = new AuthService(userRepository);
-const authController = new AuthController(authService);
+const userRepository   = new UserRepository(prisma);
+const walletRepository = new WalletRepository(prisma);
+const authService      = new AuthService(userRepository, walletRepository);
+const authController   = new AuthController(authService);
+
+const auth = createAuthMiddleware(userRepository);
 
 // ── Router ─────────────────────────────────────────────────────────────────
 export const authRouter = Router();
@@ -43,3 +44,6 @@ authRouter.post('/refresh', (req, res, next) => { void authController.refreshTok
 
 // POST /api/v1/auth/logout
 authRouter.post('/logout', (req, res, next) => { void authController.logout(req, res, next); });
+
+// GET /api/v1/auth/me  — protected, returns current user's profile
+authRouter.get('/me', (req, res, next) => { void auth(req, res, next); }, (req, res, next) => { void authController.me(req, res, next); });

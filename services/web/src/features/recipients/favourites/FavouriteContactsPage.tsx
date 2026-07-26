@@ -1,6 +1,8 @@
-import { useState, type SVGProps } from 'react';
+import { useState, useMemo, type SVGProps } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Avatar from '@/components/ui/Avatar';
 import Button from '@/components/ui/Button';
+import { userService } from '@/services';
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 
@@ -117,95 +119,15 @@ type ContactEntry = {
   accountMask: string | null;
 };
 
-const INITIAL_CONTACTS: ContactEntry[] = [
-  {
-    id: 'c1',
-    name: 'Rohan Sharma',
-    phone: '+91 98765 43210',
-    avatarColor: 'bg-emerald-100',
-    avatarTextColor: 'text-emerald-700',
-    starred: true,
-    group: 'Personal',
-    bank: null,
-    accountMask: null,
-  },
-  {
-    id: 'c2',
-    name: 'Priya Patel',
-    phone: '+91 91234 56789',
-    avatarColor: 'bg-rose-100',
-    avatarTextColor: 'text-rose-600',
-    starred: true,
-    group: null,
-    bank: 'HDFC Bank',
-    accountMask: '5678',
-  },
-  {
-    id: 'c3',
-    name: 'Amit Kumar',
-    phone: '+91 99887 66554',
-    avatarColor: 'bg-teal-100',
-    avatarTextColor: 'text-teal-700',
-    starred: true,
-    group: null,
-    bank: 'ICICI Bank',
-    accountMask: '1234',
-  },
-  {
-    id: 'c4',
-    name: 'Neha Kapoor',
-    phone: '+91 98712 34567',
-    avatarColor: 'bg-violet-100',
-    avatarTextColor: 'text-violet-700',
-    starred: true,
-    group: null,
-    bank: 'Axis Bank',
-    accountMask: '7890',
-  },
-  {
-    id: 'c5',
-    name: 'Vikram Singh',
-    phone: '+91 90001 23456',
-    avatarColor: 'bg-sky-100',
-    avatarTextColor: 'text-sky-700',
-    starred: true,
-    group: 'Personal',
-    bank: null,
-    accountMask: null,
-  },
-  {
-    id: 'c6',
-    name: 'Sneha Mehta',
-    phone: '+91 91123 45678',
-    avatarColor: 'bg-amber-100',
-    avatarTextColor: 'text-amber-700',
-    starred: false,
-    group: null,
-    bank: 'State Bank of India',
-    accountMask: '3456',
-  },
-  {
-    id: 'c7',
-    name: 'Arjun Desai',
-    phone: '+91 97777 88888',
-    avatarColor: 'bg-rose-100',
-    avatarTextColor: 'text-rose-600',
-    starred: true,
-    group: null,
-    bank: 'Kotak Mahindra Bank',
-    accountMask: '2468',
-  },
-  {
-    id: 'c8',
-    name: 'Yash Sharma',
-    phone: '+91 87654 32109',
-    avatarColor: 'bg-emerald-100',
-    avatarTextColor: 'text-emerald-700',
-    starred: true,
-    group: 'Personal',
-    bank: null,
-    accountMask: null,
-  },
+// Avatar color pool for consistent display
+const AVATAR_COLORS = [
+  { bg: 'bg-emerald-100', text: 'text-emerald-700' },
+  { bg: 'bg-rose-100', text: 'text-rose-600' },
+  { bg: 'bg-teal-100', text: 'text-teal-700' },
+  { bg: 'bg-violet-100', text: 'text-violet-700' },
+  { bg: 'bg-sky-100', text: 'text-sky-700' },
+  { bg: 'bg-amber-100', text: 'text-amber-700' },
+  { bg: 'bg-brand-100', text: 'text-brand-700' },
 ];
 
 type FilterOption = 'All Contacts' | 'Personal' | 'Business' | 'Family' | 'Bank Accounts';
@@ -338,10 +260,153 @@ function ContactRow({
 }
 
 // Add-new placeholder card (grid only)
-function AddNewCard() {
+// ─── Add New Contact Modal ────────────────────────────────────────────────────
+
+interface AddContactModalProps {
+  onClose: () => void;
+  existingPayflowIds: string[];
+}
+
+function AddContactModal({ onClose, existingPayflowIds }: AddContactModalProps) {
+  const queryClient = useQueryClient();
+  const [input, setInput] = useState('');
+  const [lookupQuery, setLookupQuery] = useState('');
+  const [error, setError] = useState('');
+
+  const { data: found, isLoading, isError } = useQuery({
+    queryKey: ['recipient', lookupQuery],
+    queryFn: () => userService.lookupRecipient(lookupQuery),
+    enabled: Boolean(lookupQuery),
+    retry: false,
+  });
+
+  const addMutation = useMutation({
+    mutationFn: (payflowId: string) => userService.addFavourite(payflowId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['favourites'] });
+      onClose();
+    },
+    onError: () => {
+      setError('Failed to add contact. Please try again.');
+    },
+  });
+
+  const handleLookup = () => {
+    const trimmed = input.trim();
+    if (!trimmed) return;
+    setError('');
+    setLookupQuery(trimmed);
+  };
+
+  const handleAdd = () => {
+    if (!found) return;
+    if (existingPayflowIds.includes(found.payflowId)) {
+      setError('This contact is already in your favourites.');
+      return;
+    }
+    addMutation.mutate(found.payflowId);
+  };
+
+  const isDuplicate = found && existingPayflowIds.includes(found.payflowId);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 backdrop-blur-sm p-4"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="w-full max-w-md rounded-[1.5rem] border border-border bg-surface p-6 shadow-[0_24px_60px_rgba(15,23,42,0.18)]">
+        <div className="mb-5 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-text-primary">Add New Contact</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-8 w-8 items-center justify-center rounded-full text-text-muted hover:bg-surface-muted hover:text-text-primary transition-colors"
+            aria-label="Close"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4">
+              <path d="M18 6 6 18M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <p className="mb-4 text-sm text-text-secondary">Enter a PayFlow ID to find and save a contact.</p>
+
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={input}
+            onChange={(e) => {
+              setInput(e.target.value);
+              setError('');
+              if (!e.target.value.trim()) setLookupQuery('');
+            }}
+            onKeyDown={(e) => { if (e.key === 'Enter') handleLookup(); }}
+            placeholder="e.g. priya1234@payflow"
+            className="flex-1 rounded-xl border border-border bg-surface-subtle px-4 py-2.5 text-sm text-text-primary placeholder:text-text-muted outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all"
+          />
+          <Button
+            variant="secondary"
+            onClick={handleLookup}
+            disabled={isLoading || !input.trim()}
+            className="rounded-xl px-4 shrink-0"
+          >
+            {isLoading ? 'Searching…' : 'Search'}
+          </Button>
+        </div>
+
+        {lookupQuery && isError && (
+          <p className="mt-2 text-sm text-danger">No user found with PayFlow ID: {lookupQuery}</p>
+        )}
+
+        {found && !isError && (
+          <div className="mt-3 flex items-center gap-3 rounded-xl border border-success/20 bg-success/5 px-4 py-3">
+            <Avatar name={found.displayName} size="md" className="bg-brand-100 text-brand-700" />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-text-primary">{found.displayName}</p>
+              <p className="text-xs text-text-muted">{found.payflowId}</p>
+            </div>
+            {isDuplicate && (
+              <span className="text-xs text-text-muted">Already added</span>
+            )}
+          </div>
+        )}
+
+        {error && (
+          <p className="mt-2 rounded-lg bg-danger/5 border border-danger/20 px-3 py-2 text-sm text-danger">{error}</p>
+        )}
+
+        <div className="mt-5 flex gap-3">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={onClose}
+            className="flex-1 rounded-2xl"
+            disabled={addMutation.isPending}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            variant="primary"
+            onClick={handleAdd}
+            className="flex-1 rounded-2xl"
+            disabled={!found || isError || isDuplicate || addMutation.isPending}
+          >
+            {addMutation.isPending ? 'Adding…' : 'Add Contact'}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Add New Card (grid placeholder) ─────────────────────────────────────────
+
+function AddNewCard({ onClick }: { onClick: () => void }) {
   return (
     <button
       type="button"
+      onClick={onClick}
       className="group flex flex-col items-start gap-3 rounded-2xl border border-dashed border-brand-300 bg-brand-50/60 p-4 transition-all duration-150 hover:border-brand-400 hover:bg-brand-50"
     >
       <span className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-dashed border-brand-300 bg-brand-100 text-brand-600 transition-colors group-hover:border-brand-400">
@@ -358,18 +423,49 @@ function AddNewCard() {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export function FavouriteContactsPage() {
-  const [contacts, setContacts] = useState<ContactEntry[]>(INITIAL_CONTACTS);
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<FilterOption>('All Contacts');
   const [sort, setSort] = useState<SortOption>('Recently Added');
   const [view, setView] = useState<ViewMode>('grid');
   const [filterOpen, setFilterOpen] = useState(false);
   const [sortOpen, setSortOpen] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
+
+  // Load real favourites from backend
+  const { data: apiFavourites = [] } = useQuery({
+    queryKey: ['favourites'],
+    queryFn: userService.getFavourites,
+    staleTime: 60_000,
+  });
+
+  // Map API favourites to the ContactEntry shape
+  const contacts = useMemo((): ContactEntry[] =>
+    apiFavourites.map((f, i) => {
+      const color = AVATAR_COLORS[i % AVATAR_COLORS.length];
+      return {
+        id: f.payflowId,
+        name: f.displayName,
+        phone: f.payflowId,
+        avatarColor: color.bg,
+        avatarTextColor: color.text,
+        starred: true,
+        group: null,
+        bank: null,
+        accountMask: null,
+      };
+    }), [apiFavourites]);
+
+  const removeFavouriteMutation = useMutation({
+    mutationFn: (payflowId: string) => userService.removeFavourite(payflowId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['favourites'] });
+    },
+  });
 
   const toggleStar = (id: string) => {
-    setContacts((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, starred: !c.starred } : c)),
-    );
+    // id is the payflowId in this implementation
+    removeFavouriteMutation.mutate(id);
   };
 
   // Filter
@@ -406,6 +502,7 @@ export function FavouriteContactsPage() {
           size="md"
           leftIcon={<PlusIcon className="h-4 w-4" />}
           className="h-11 shrink-0 rounded-2xl bg-brand-600 px-5 font-semibold shadow-[0_6px_20px_rgba(109,40,217,0.24)] hover:bg-brand-700"
+          onClick={() => setShowAddModal(true)}
         >
           Add New Contact
         </Button>
@@ -514,7 +611,7 @@ export function FavouriteContactsPage() {
           {visible.map((contact) => (
             <ContactCard key={contact.id} contact={contact} onToggleStar={toggleStar} />
           ))}
-          <AddNewCard />
+          <AddNewCard onClick={() => setShowAddModal(true)} />
         </div>
       ) : (
         <div className="space-y-2">
@@ -543,6 +640,13 @@ export function FavouriteContactsPage() {
           <ArrowRightIcon className="h-4 w-4" />
         </button>
       </div>
+
+      {showAddModal && (
+        <AddContactModal
+          onClose={() => setShowAddModal(false)}
+          existingPayflowIds={contacts.map((c) => c.id)}
+        />
+      )}
     </div>
   );
 }

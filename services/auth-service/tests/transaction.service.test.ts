@@ -79,6 +79,8 @@ function makeTxDetail(overrides: Partial<TransactionWithDetails> = {}): Transact
     id: 'tx-1',
     amount: new TestDecimal('200.00') as never,
     status: 'COMPLETED',
+    type: 'TRANSFER',
+    direction: 'DEBIT',
     note: null,
     createdAt: new Date('2024-06-01'),
     senderId: 'user-1',
@@ -178,16 +180,20 @@ describe('TransactionService.getDashboard()', () => {
     txRepo.findByUserWithDetails.mockResolvedValue([]);
   }
 
-  it('throws NotFoundError when wallet does not exist', async () => {
+  it('auto-creates wallet and returns ₹0 balance when none exists', async () => {
     const walletRepo = makeWalletRepo();
     walletRepo.findByUserId.mockResolvedValue(null);
+    walletRepo.create.mockResolvedValue(makeWallet('0') as never);
 
     const txRepo = makeTxRepo();
     setupBaseTxRepo(txRepo);
 
     const service = makeService(walletRepo, txRepo);
 
-    await expect(service.getDashboard('user-1')).rejects.toBeInstanceOf(NotFoundError);
+    const result = await service.getDashboard('user-1');
+
+    expect(walletRepo.create).toHaveBeenCalledWith({ userId: 'user-1' });
+    expect(result.balance).toBe('0');
   });
 
   it('returns balance, totalSent, totalReceived, recentTransactions', async () => {

@@ -37,7 +37,12 @@ export interface TransferResult {
 export interface TransactionHistoryItem {
   id: string;
   amount: string;
+  /** PENDING | COMPLETED | FAILED */
   status: string;
+  /** ADD_MONEY | TRANSFER */
+  type: string;
+  /** CREDIT | DEBIT */
+  direction: string;
   note: string | null;
   createdAt: Date;
   senderPayflowId: string;
@@ -77,6 +82,8 @@ export class TransactionService {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-call
       amount: tx.amount.toString(),
       status: tx.status,
+      type: tx.type,
+      direction: tx.direction,
       note: tx.note,
       createdAt: tx.createdAt,
       senderPayflowId: tx.sender.payflowId,
@@ -112,10 +119,10 @@ export class TransactionService {
       throw new ConflictError('Cannot transfer money to yourself');
     }
 
-    // 5. Check sender has a wallet with sufficient balance
-    const senderWallet = await this.walletRepository.findByUserId(sender.id);
+    // 5. Get sender wallet — auto-create for legacy users without one
+    let senderWallet = await this.walletRepository.findByUserId(sender.id);
     if (senderWallet === null) {
-      throw new NotFoundError('Sender wallet not found');
+      senderWallet = await this.walletRepository.create({ userId: sender.id });
     }
 
     // eslint-disable-next-line @typescript-eslint/no-unsafe-call
@@ -125,16 +132,18 @@ export class TransactionService {
       throw new UnprocessableEntityError('Insufficient balance');
     }
 
-    // 6. Check receiver has a wallet
-    const receiverWallet = await this.walletRepository.findByUserId(receiver.id);
+    // 6. Get receiver wallet — auto-create for legacy users without one
+    let receiverWallet = await this.walletRepository.findByUserId(receiver.id);
     if (receiverWallet === null) {
-      throw new NotFoundError('Receiver wallet not found');
+      receiverWallet = await this.walletRepository.create({ userId: receiver.id });
     }
 
-    // 7. Run ONE atomic Prisma transaction:
-    //    - debit sender wallet
-    //    - credit receiver wallet
-    //    - create transaction record
+    // 7. Single atomic $transaction block:
+    //      • debit sender wallet
+    //      • credit receiver wallet
+    //      • create DEBIT record  (sender's ledger entry)
+    //      • create CREDIT record (receiver's ledger entry)
+    //    All four writes succeed or all four roll back.
     const result = await this.db.$transaction(async (tx) => {
       const txClient = tx as unknown as PrismaClient;
 
@@ -148,27 +157,44 @@ export class TransactionService {
         data: { balance: { increment: decimalAmount } },
       });
 
-      const txRecord = await txClient.transaction.create({
+      // Sender's view: DEBIT (money left their wallet)
+      const debitRecord = await txClient.transaction.create({
         data: {
           senderId: sender.id,
           receiverId: receiver.id,
           amount: decimalAmount,
           status: 'COMPLETED',
+          type: 'TRANSFER',
+          direction: 'DEBIT',
           note: note ?? null,
         },
       });
 
-      return { updatedSenderWallet, updatedReceiverWallet, txRecord };
+      // Receiver's view: CREDIT (money arrived in their wallet)
+      await txClient.transaction.create({
+        data: {
+          senderId: sender.id,
+          receiverId: receiver.id,
+          amount: decimalAmount,
+          status: 'COMPLETED',
+          type: 'TRANSFER',
+          direction: 'CREDIT',
+          note: note ?? null,
+        },
+      });
+
+      return { updatedSenderWallet, updatedReceiverWallet, debitRecord };
     });
 
-    // 8. Return result
+    // 8. Return result — expose sender's DEBIT record id as the primary transactionId
+    const receiverDisplayName = receiver.payflowId.split('@')[0] ?? receiver.payflowId;
     return {
-      transactionId: result.txRecord.id,
+      transactionId: result.debitRecord.id,
       // eslint-disable-next-line @typescript-eslint/no-unsafe-call
       senderBalance: result.updatedSenderWallet.balance.toString(),
       // eslint-disable-next-line @typescript-eslint/no-unsafe-call
       receiverBalance: result.updatedReceiverWallet.balance.toString(),
-      receiverName: receiver.email,
+      receiverName: receiverDisplayName,
       receiverPayflowId: receiver.payflowId,
     };
   }
@@ -199,7 +225,7 @@ export class TransactionService {
   // Aggregates balance + totals + stats + recent 5 transactions in parallel.
   async getDashboard(userId: string): Promise<DashboardResult> {
     const [
-      wallet,
+      walletOrNull,
       totalSentDecimal,
       totalReceivedDecimal,
       monthlySendingDecimal,
@@ -220,9 +246,8 @@ export class TransactionService {
       this.transactionRepository.findByUserWithDetails(userId, 5),
     ]);
 
-    if (wallet === null) {
-      throw new NotFoundError('Wallet not found');
-    }
+    // Auto-create wallet for users who registered before auto-creation was wired
+    const wallet = walletOrNull ?? await this.walletRepository.create({ userId });
 
     return {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-call

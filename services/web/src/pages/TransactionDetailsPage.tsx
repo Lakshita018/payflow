@@ -1,16 +1,14 @@
-import { useEffect, useState, type ReactNode, type SVGProps } from 'react';
+import { useEffect, useState, useMemo, type ReactNode, type SVGProps } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import Avatar from '@/components/ui/Avatar';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 import { ROUTES } from '@/routes/paths';
 import { ArrowDownLeftIcon, ArrowUpRightIcon, ShieldIcon } from '@/features/dashboard/icons';
-import {
-  createReceiptPdfBlob,
-  createTransactionSummary,
-  getTransactionRecordById,
-  type TransactionRecord,
-} from '@/features/transactions/mockTransactions';
+import { transactionService } from '@/services';
+import { createReceiptPdfBlob, createTransactionSummary, type TransactionRecord } from '@/features/transactions/mockTransactions';
+import type { Transaction } from '@/types';
 
 type AccentTone = 'success' | 'danger';
 
@@ -73,17 +71,7 @@ function SectionTitle({ title, icon }: { title: string; icon: ReactNode }) {
   );
 }
 
-function InfoRow({
-  label,
-  value,
-  icon,
-  action,
-}: {
-  label: string;
-  value: ReactNode;
-  icon: ReactNode;
-  action?: ReactNode;
-}) {
+function InfoRow({ label, value, icon, action }: { label: string; value: ReactNode; icon: ReactNode; action?: ReactNode }) {
   return (
     <div className="grid grid-cols-[1.5rem_minmax(0,1fr)_auto] items-center gap-3 py-2.5 first:pt-0 last:pb-0">
       <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-brand-50 text-brand-600">
@@ -102,7 +90,7 @@ function MiniLabel({ children }: { children: ReactNode }) {
   return <span className="text-[0.7rem] font-semibold uppercase tracking-[0.16em] text-brand-700">{children}</span>;
 }
 
-function StatusGlyph({ kind }: { kind: TransactionRecord['kind'] }) {
+function StatusGlyph({ kind }: { kind: 'received' | 'sent' }) {
   const Icon = kind === 'received' ? ArrowDownLeftIcon : ArrowUpRightIcon;
   const tone: AccentTone = kind === 'received' ? 'success' : 'danger';
   const classes = tone === 'success'
@@ -155,23 +143,63 @@ function Toast({ message }: { message: string }) {
   );
 }
 
+// ── Converts a backend Transaction to a TransactionRecord for PDF/share ──────
+// direction is the authoritative field: CREDIT = money in, DEBIT = money out.
+
+function toRecord(tx: Transaction): TransactionRecord {
+  const isAddMoney = tx.type === 'ADD_MONEY';
+  const isCredit = tx.direction === 'CREDIT';
+  // DEBIT → counterparty is receiver; CREDIT → counterparty is sender; ADD_MONEY → wallet
+  const counterpartyPayflowId = isAddMoney ? 'wallet' : (isCredit ? tx.senderPayflowId : tx.receiverPayflowId);
+  const counterpartyName = counterpartyPayflowId?.split('@')[0] ?? counterpartyPayflowId ?? 'Unknown';
+  const num = parseFloat(tx.amount);
+  const formatted = '₹' + num.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const date = new Date(tx.createdAt as unknown as string);
+  return {
+    id: tx.id,
+    name: isAddMoney ? 'Wallet Top-up' : counterpartyName,
+    phone: isAddMoney ? '—' : counterpartyPayflowId ?? '—',
+    description: tx.note ?? (isAddMoney ? 'Added to wallet' : 'Transfer'),
+    transactionId: tx.id.split('-')[0].toUpperCase(),
+    date: date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
+    time: date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
+    amount: isCredit ? `+ ${formatted}` : `- ${formatted}`,
+    kind: isCredit ? 'received' : 'sent',
+    initials: isAddMoney ? 'W' : counterpartyName.slice(0, 2).toUpperCase(),
+    contactLabel: isCredit ? 'From' : 'To',
+    statusLabel: isAddMoney ? 'Added' : (isCredit ? 'Received' : 'Sent'),
+    referenceId: tx.id,
+    paymentMethod: 'PayFlow Wallet',
+    amountSign: isCredit ? '+' : '-',
+    amountValue: formatted,
+    amountWords: '',
+    summaryDate: date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
+    summaryTime: date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
+    dateTime: `${date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} · ${date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`,
+  };
+}
+
 export function TransactionDetailsPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const transaction = getTransactionRecordById(id);
   const [toastMessage, setToastMessage] = useState('');
 
-  useEffect(() => {
-    if (!toastMessage)
-      return undefined;
+  const { data: tx, isLoading, isError } = useQuery({
+    queryKey: ['transaction', id],
+    queryFn: () => transactionService.getById(id!),
+    enabled: Boolean(id),
+    retry: false,
+  });
 
+  const transaction = useMemo(() => tx ? toRecord(tx) : undefined, [tx]);
+
+  useEffect(() => {
+    if (!toastMessage) return undefined;
     const timeout = window.setTimeout(() => setToastMessage(''), 1800);
     return () => window.clearTimeout(timeout);
   }, [toastMessage]);
 
-  const showToast = (message: string) => {
-    setToastMessage(message);
-  };
+  const showToast = (message: string) => setToastMessage(message);
 
   const handleBack = () => {
     const historyState = window.history.state as { idx?: number } | null;
@@ -179,14 +207,11 @@ export function TransactionDetailsPage() {
       navigate(-1);
       return;
     }
-
     navigate(ROUTES.TRANSACTIONS, { replace: true, preventScrollReset: true });
   };
 
   const downloadReceipt = () => {
-    if (!transaction)
-      return;
-
+    if (!transaction) return;
     const blob = createReceiptPdfBlob(transaction);
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -199,24 +224,11 @@ export function TransactionDetailsPage() {
   };
 
   const shareTransaction = async () => {
-    if (!transaction)
-      return;
-
+    if (!transaction) return;
     const summary = createTransactionSummary(transaction);
-
     if ('share' in navigator) {
-      try {
-        await navigator.share({
-          title: 'PayFlow Transaction',
-          text: summary,
-        });
-        showToast('Transaction shared');
-        return;
-      } catch {
-        return;
-      }
+      try { await navigator.share({ title: 'PayFlow Transaction', text: summary }); showToast('Transaction shared'); return; } catch { return; }
     }
-
     try {
       await (navigator as Navigator & { clipboard: Clipboard }).clipboard.writeText(summary);
       showToast('Transaction copied');
@@ -234,32 +246,30 @@ export function TransactionDetailsPage() {
     }
   };
 
-  if (!transaction) {
+  if (isLoading) {
+    return (
+      <div className="mx-auto w-full max-w-none px-4 pb-3 sm:px-6 lg:px-8 xl:px-10">
+        <div className="flex min-h-[240px] items-center justify-center text-text-muted text-sm">Loading transaction…</div>
+      </div>
+    );
+  }
+
+  if (isError || !transaction) {
     return (
       <div className="mx-auto w-full max-w-none px-4 pb-3 sm:px-6 lg:px-8 xl:px-10">
         <div className="mb-3 flex items-center gap-3">
-          <button
-            type="button"
-            onClick={handleBack}
-            className="inline-flex items-center gap-2 text-sm font-semibold text-brand-700 hover:text-brand-800"
-          >
+          <button type="button" onClick={handleBack} className="inline-flex items-center gap-2 text-sm font-semibold text-brand-700 hover:text-brand-800">
             <BackArrowIcon className="h-4 w-4" />
             Back to Transactions
           </button>
         </div>
-
         <CardShell className="flex min-h-[240px] items-center justify-center p-6 text-center">
           <div className="max-w-md space-y-4">
             <div>
               <h1 className="text-2xl font-semibold text-text-primary">Transaction not found</h1>
-              <p className="mt-2 text-sm text-text-secondary">
-                We could not find a transaction for this link. It may have been removed or the address may be invalid.
-              </p>
+              <p className="mt-2 text-sm text-text-secondary">We could not find a transaction for this link. It may have been removed or the address may be invalid.</p>
             </div>
-
-            <Button variant="primary" onClick={handleBack} className="rounded-2xl px-5">
-              Back to Transactions
-            </Button>
+            <Button variant="primary" onClick={handleBack} className="rounded-2xl px-5">Back to Transactions</Button>
           </div>
         </CardShell>
       </div>
@@ -275,11 +285,7 @@ export function TransactionDetailsPage() {
     <>
       <div className="mx-auto w-full max-w-none px-4 pb-3 sm:px-6 lg:px-8 xl:px-10">
         <div className="mb-3 flex items-center gap-3">
-          <button
-            type="button"
-            onClick={handleBack}
-            className="inline-flex items-center gap-2 text-sm font-semibold text-brand-700 hover:text-brand-800"
-          >
+          <button type="button" onClick={handleBack} className="inline-flex items-center gap-2 text-sm font-semibold text-brand-700 hover:text-brand-800">
             <BackArrowIcon className="h-4 w-4" />
             Back to Transactions
           </button>
@@ -292,24 +298,18 @@ export function TransactionDetailsPage() {
             <div className="grid h-full gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
               <div className="flex items-center gap-3.5 lg:gap-5">
                 <StatusGlyph kind={transaction.kind} />
-
                 <div className="min-w-0">
                   <div className="mb-1 flex items-center gap-2">
-                    <Badge variant={accentTone} className="px-3 py-1 text-xs font-semibold">
-                      {transaction.statusLabel}
-                    </Badge>
+                    <Badge variant={accentTone} className="px-3 py-1 text-xs font-semibold">{transaction.statusLabel}</Badge>
                   </div>
                   <div className={['text-[2rem] font-semibold leading-none tracking-tight lg:text-[2.25rem]', accentText].join(' ')}>
                     {transaction.amountSign} {transaction.amountValue}
                   </div>
-                  <p className="mt-1 text-xs text-text-secondary lg:text-sm">{transaction.amountWords}</p>
+                  <p className="mt-1 text-xs text-text-secondary lg:text-sm">{transaction.amountWords || ''}</p>
                 </div>
               </div>
-
               <div className="flex items-center justify-start gap-3 lg:justify-end">
-                <Badge variant={accentTone} className="px-3 py-1 text-xs font-semibold">
-                  Completed
-                </Badge>
+                <Badge variant={accentTone} className="px-3 py-1 text-xs font-semibold">Completed</Badge>
                 <div className="h-8 w-px bg-border/80" />
                 <div className="text-right">
                   <p className="text-sm font-medium text-text-primary">{transaction.summaryDate}, {transaction.summaryTime}</p>
@@ -320,18 +320,9 @@ export function TransactionDetailsPage() {
           </CardShell>
 
           <CardShell className="p-3.5 lg:col-span-6 lg:p-4.5">
-            <SectionTitle
-              title="Transaction Overview"
-              icon={<span className="text-sm font-semibold leading-none">▤</span>}
-            />
-
+            <SectionTitle title="Transaction Overview" icon={<span className="text-sm font-semibold leading-none">▤</span>} />
             <div className="grid gap-4 lg:grid-cols-[auto_minmax(0,1fr)] lg:items-start">
-              <Avatar
-                name={transaction.name}
-                size="xl"
-                className={isReceived ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger'}
-              />
-
+              <Avatar name={transaction.name} size="xl" className={isReceived ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger'} />
               <div className="min-w-0">
                 <MiniLabel>{transaction.contactLabel}</MiniLabel>
                 <h3 className="mt-1 truncate text-xl font-semibold text-text-primary">{transaction.name}</h3>
@@ -339,60 +330,21 @@ export function TransactionDetailsPage() {
                 <p className="mt-2 text-sm text-text-secondary">{transaction.description}</p>
               </div>
             </div>
-
             <div className="mt-4 divide-y divide-border/80">
-              <InfoRow
-                label="Transaction ID"
-                value={transaction.transactionId}
-                icon={<span className="text-sm font-semibold leading-none">#</span>}
-                action={<CopyButton value={transaction.transactionId} onCopied={showToast} />}
-              />
-              <InfoRow
-                label="Reference ID"
-                value={transaction.referenceId}
-                icon={<span className="text-sm font-semibold leading-none">⌁</span>}
-                action={<CopyButton value={transaction.referenceId} onCopied={showToast} />}
-              />
+              <InfoRow label="Transaction ID" value={transaction.transactionId} icon={<span className="text-sm font-semibold leading-none">#</span>} action={<CopyButton value={transaction.transactionId} onCopied={showToast} />} />
+              <InfoRow label="Reference ID" value={transaction.referenceId.slice(0, 8) + '…'} icon={<span className="text-sm font-semibold leading-none">⌁</span>} action={<CopyButton value={transaction.referenceId} onCopied={showToast} />} />
             </div>
           </CardShell>
 
           <CardShell className="p-3.5 lg:col-span-6 lg:p-4.5">
-            <SectionTitle
-              title="Payment Details"
-              icon={<span className="text-sm font-semibold leading-none">▭</span>}
-            />
-
+            <SectionTitle title="Payment Details" icon={<span className="text-sm font-semibold leading-none">▭</span>} />
             <div className="divide-y divide-border/80">
-              <InfoRow
-                label="Status"
-                value={<Badge variant={accentTone} className="px-3 py-1 text-xs font-semibold">{transaction.statusLabel}</Badge>}
-                icon={<span className="text-sm leading-none">●</span>}
-              />
-              <InfoRow
-                label="Date & Time"
-                value={transaction.dateTime}
-                icon={<span className="text-sm leading-none">📅</span>}
-              />
-              <InfoRow
-                label="Payment Method"
-                value={transaction.paymentMethod}
-                icon={<span className="text-sm leading-none">◫</span>}
-              />
-              <InfoRow
-                label="Amount"
-                value={<span className={accentText}>{transaction.amountValue}</span>}
-                icon={<span className="text-sm leading-none">₹</span>}
-              />
-              <InfoRow
-                label="Fee"
-                value="₹0.00"
-                icon={<span className="text-sm leading-none">₨</span>}
-              />
-              <InfoRow
-                label="Total"
-                value={<span className={['text-base font-semibold', accentText].join(' ')}>{transaction.amountValue}</span>}
-                icon={<span className="text-sm leading-none">∑</span>}
-              />
+              <InfoRow label="Status" value={<Badge variant={accentTone} className="px-3 py-1 text-xs font-semibold">{transaction.statusLabel}</Badge>} icon={<span className="text-sm leading-none">●</span>} />
+              <InfoRow label="Date & Time" value={transaction.dateTime} icon={<span className="text-sm leading-none">📅</span>} />
+              <InfoRow label="Payment Method" value={transaction.paymentMethod} icon={<span className="text-sm leading-none">◫</span>} />
+              <InfoRow label="Amount" value={<span className={accentText}>{transaction.amountValue}</span>} icon={<span className="text-sm leading-none">₹</span>} />
+              <InfoRow label="Fee" value="₹0.00" icon={<span className="text-sm leading-none">₨</span>} />
+              <InfoRow label="Total" value={<span className={['text-base font-semibold', accentText].join(' ')}>{transaction.amountValue}</span>} icon={<span className="text-sm leading-none">∑</span>} />
             </div>
           </CardShell>
 
@@ -401,33 +353,17 @@ export function TransactionDetailsPage() {
               <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-brand-50 text-brand-600">
                 <ShieldIcon className="h-5 w-5" />
               </span>
-              <p className="text-sm leading-6 text-text-secondary lg:text-base">
-                This transaction is protected by PayFlow.
-              </p>
+              <p className="text-sm leading-6 text-text-secondary lg:text-base">This transaction is protected by PayFlow.</p>
             </CardShell>
 
             <CardShell className="flex min-h-[100px] items-center p-3.5 lg:p-4.5">
-              <Button
-                variant="secondary"
-                fullWidth
-                size="lg"
-                onClick={downloadReceipt}
-                leftIcon={<DownloadIcon className="h-4 w-4" />}
-                className="h-12 rounded-2xl border border-brand-200 bg-surface px-5 text-brand-700 shadow-sm hover:bg-brand-50"
-              >
+              <Button variant="secondary" fullWidth size="lg" onClick={downloadReceipt} leftIcon={<DownloadIcon className="h-4 w-4" />} className="h-12 rounded-2xl border border-brand-200 bg-surface px-5 text-brand-700 shadow-sm hover:bg-brand-50">
                 Download Receipt
               </Button>
             </CardShell>
 
             <CardShell className="flex min-h-[100px] items-center p-3.5 lg:p-4.5">
-              <Button
-                variant="secondary"
-                fullWidth
-                size="lg"
-                onClick={shareTransaction}
-                leftIcon={<ShareIcon className="h-4 w-4" />}
-                className="h-12 rounded-2xl border border-brand-200 bg-surface px-5 text-brand-700 shadow-sm hover:bg-brand-50"
-              >
+              <Button variant="secondary" fullWidth size="lg" onClick={shareTransaction} leftIcon={<ShareIcon className="h-4 w-4" />} className="h-12 rounded-2xl border border-brand-200 bg-surface px-5 text-brand-700 shadow-sm hover:bg-brand-50">
                 Share Transaction
               </Button>
             </CardShell>

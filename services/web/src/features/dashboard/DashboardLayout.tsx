@@ -2,9 +2,12 @@ import { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { TopNavigation } from './TopNavigation';
+import { useInitAuth } from '@/hooks';
 
 export function DashboardLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  // Restore user profile from token on every page load / tab refresh
+  useInitAuth();
 
   return (
     <div className="min-h-screen bg-surface-subtle text-text-primary lg:pl-68">

@@ -16,7 +16,8 @@
 // ---------------------------------------------------------------------------
 import bcrypt from 'bcrypt';
 import { UserRepository } from '../repositories/user.repository';
-import { ConflictError, InternalServerError, UnauthorizedError } from '../utils/errors';
+import { WalletRepository } from '../repositories/wallet.repository';
+import { ConflictError, InternalServerError, UnauthorizedError, NotFoundError } from '../utils/errors';
 import { registerSchema, loginSchema } from '../validators/auth.validator';
 import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from '../utils/jwt';
 import { config } from '../config/env';
@@ -34,6 +35,14 @@ export interface RegisterInput {
 export interface RegisterResult {
   id: string;
   email: string;
+  payflowId: string;
+  createdAt: Date;
+}
+
+export interface MeResult {
+  id: string;
+  email: string;
+  payflowId: string;
   createdAt: Date;
 }
 
@@ -59,7 +68,10 @@ export interface AuthTokens {
 // AuthService
 // ---------------------------------------------------------------------------
 export class AuthService {
-  constructor(private readonly userRepository: UserRepository) {}
+  constructor(
+    private readonly userRepository: UserRepository,
+    private readonly walletRepository?: WalletRepository,
+  ) {}
 
   // ── Register ──────────────────────────────────────────────────────────────
   async register(input: RegisterInput): Promise<RegisterResult> {
@@ -94,10 +106,20 @@ export class AuthService {
     // 5. Persist
     const user = await this.userRepository.create({ email, payflowId, passwordHash });
 
-    // 6. Return — passwordHash intentionally excluded from the result shape
+    // 6. Auto-create wallet so the user starts with ₹0 balance
+    if (this.walletRepository) {
+      try {
+        await this.walletRepository.create({ userId: user.id });
+      } catch {
+        // Wallet already exists (shouldn't happen on first register) — ignore
+      }
+    }
+
+    // 7. Return — passwordHash intentionally excluded from the result shape
     return {
       id: user.id,
       email: user.email,
+      payflowId: user.payflowId,
       createdAt: user.createdAt,
     };
   }
@@ -190,5 +212,20 @@ export class AuthService {
     // 2. Clear the refresh token hash — any subsequent refresh attempt will
     //    fail at the "hash is null" guard in refreshToken().
     await this.userRepository.clearRefreshTokenHash(user.id);
+  }
+
+  // ── Get current user (me) ─────────────────────────────────────────────────
+  // Returns the authenticated user's public profile including payflowId.
+  async getMe(userId: string): Promise<MeResult> {
+    const user = await this.userRepository.findById(userId);
+    if (user === null) {
+      throw new NotFoundError('User not found');
+    }
+    return {
+      id: user.id,
+      email: user.email,
+      payflowId: user.payflowId,
+      createdAt: user.createdAt,
+    };
   }
 }
