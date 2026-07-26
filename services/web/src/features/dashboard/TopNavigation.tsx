@@ -14,7 +14,7 @@ const pageMeta: Record<string, { title: string; subtitle: string }> = {
   [ROUTES.TRANSACTIONS]: { title: 'Transactions', subtitle: 'View and manage all your payment activity.' },
   [ROUTES.SEND_MONEY]: { title: 'Send Money', subtitle: 'Move money to a saved contact.' },
   [ROUTES.TRANSFER]: { title: 'Send Money', subtitle: 'Move money to a saved contact.' },
-  [ROUTES.FAVOURITES]: { title: 'Favourite Contacts', subtitle: 'Your saved recipients.' },
+  [ROUTES.FAVOURITES]: { title: 'Favourite Contacts', subtitle: 'Quick access to your most important people' },
   [ROUTES.PROFILE]: { title: 'Profile', subtitle: 'Manage your PayFlow account.' },
   [ROUTES.SETTINGS]: { title: 'Settings', subtitle: 'Adjust your preferences.' },
 };

@@ -1,4 +1,9 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useRegisterMutation } from '@/hooks';
+import type { AxiosError } from 'axios';
+import type { ApiError } from '@/types';
+import { ROUTES } from '@/routes/paths';
 
 const inputClassName =
   'h-14 w-full rounded-2xl border border-slate-200 bg-slate-50/80 px-4 text-sm text-slate-900 shadow-sm transition-all duration-200 placeholder:text-slate-400 hover:border-slate-300 hover:bg-white hover:shadow-md focus:border-brand-700 focus:bg-white focus:outline-none focus:ring-4 focus:ring-brand-700/10';
@@ -33,17 +38,41 @@ function MailIcon() {
   );
 }
 
-function PersonIcon() {
-  return (
-    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} aria-hidden="true">
-      <circle cx="12" cy="8.5" r="3.5" />
-      <path d="M5 20c1.6-3.6 5-5.5 7-5.5s5.4 1.9 7 5.5" />
-    </svg>
-  );
+// Extracts a human-readable error message from an Axios error response.
+function getApiErrorMessage(err: unknown): string {
+  const axiosErr = err as AxiosError<ApiError>;
+  if (axiosErr.response?.data?.details?.length) {
+    return axiosErr.response.data.details.map((d) => d.message).join(' ');
+  }
+  return axiosErr.response?.data?.error ?? 'Something went wrong. Please try again.';
 }
 
 export function RegisterPage() {
   const navigate = useNavigate();
+  const registerMutation = useRegisterMutation();
+
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [clientError, setClientError] = useState('');
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setClientError('');
+
+    if (password.length < 8) {
+      setClientError('Password must be at least 8 characters.');
+      return;
+    }
+    if (password !== confirmPassword) {
+      setClientError('Passwords do not match.');
+      return;
+    }
+
+    registerMutation.mutate({ email: email.trim(), password });
+  };
+
+  const displayError = clientError || (registerMutation.isError ? getApiErrorMessage(registerMutation.error) : '');
 
   return (
     <div className="fixed inset-0 z-50 overflow-hidden bg-slate-50 text-slate-900">
@@ -57,7 +86,7 @@ export function RegisterPage() {
           <div className="relative flex w-full flex-col justify-between">
             <button
               type="button"
-              onClick={() => navigate('/login')}
+              onClick={() => navigate(ROUTES.LOGIN)}
               className="flex items-center gap-3 text-left transition-opacity duration-200 hover:opacity-90"
             >
               <LogoMark />
@@ -169,7 +198,7 @@ export function RegisterPage() {
 
           <div className="w-full max-w-2xl rounded-[24px] border border-white/70 bg-white/90 p-5 shadow-[0_30px_80px_rgba(15,23,42,0.12)] backdrop-blur-xl sm:p-8 lg:p-10">
             <div className="mb-8 flex items-center gap-3 lg:hidden">
-              <button type="button" onClick={() => navigate('/login')} className="flex items-center gap-3 text-left transition-opacity duration-200 hover:opacity-90">
+              <button type="button" onClick={() => navigate(ROUTES.LOGIN)} className="flex items-center gap-3 text-left transition-opacity duration-200 hover:opacity-90">
                 <LogoMark />
                 <div>
                   <p className="text-lg font-semibold tracking-tight text-slate-900">PayFlow</p>
@@ -187,18 +216,20 @@ export function RegisterPage() {
               </p>
             </div>
 
-            <div className="mt-8 space-y-5">
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="full-name">
-                  Full Name
-                </label>
-                <div className="group relative">
-                  <span className="pointer-events-none absolute inset-y-0 left-4 flex items-center text-slate-400 transition-colors group-hover:text-slate-500">
-                    <PersonIcon />
-                  </span>
-                  <input id="full-name" type="text" placeholder="Your full name" className={`${inputClassName} pl-11`} />
+            <form className="mt-8 space-y-5" onSubmit={handleSubmit} noValidate>
+              {/* Error banner — shows client-side or API errors */}
+              {displayError && (
+                <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
+                  {displayError}
                 </div>
-              </div>
+              )}
+
+              {/* Success banner after registration */}
+              {registerMutation.isSuccess && (
+                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700" role="status">
+                  Account created! Redirecting to sign in…
+                </div>
+              )}
 
               <div>
                 <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="register-email">
@@ -208,7 +239,16 @@ export function RegisterPage() {
                   <span className="pointer-events-none absolute inset-y-0 left-4 flex items-center text-slate-400 transition-colors group-hover:text-slate-500">
                     <MailIcon />
                   </span>
-                  <input id="register-email" type="email" placeholder="you@example.com" className={`${inputClassName} pl-11`} />
+                  <input
+                    id="register-email"
+                    type="email"
+                    autoComplete="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="you@example.com"
+                    className={`${inputClassName} pl-11`}
+                  />
                 </div>
               </div>
 
@@ -220,7 +260,16 @@ export function RegisterPage() {
                   <span className="pointer-events-none absolute inset-y-0 left-4 flex items-center text-slate-400 transition-colors group-hover:text-slate-500">
                     <LockIcon />
                   </span>
-                  <input id="register-password" type="password" placeholder="Create a password" className={`${inputClassName} pl-11 pr-11`} />
+                  <input
+                    id="register-password"
+                    type="password"
+                    autoComplete="new-password"
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Create a password (min 8 chars)"
+                    className={`${inputClassName} pl-11 pr-11`}
+                  />
                 </div>
               </div>
 
@@ -232,34 +281,50 @@ export function RegisterPage() {
                   <span className="pointer-events-none absolute inset-y-0 left-4 flex items-center text-slate-400 transition-colors group-hover:text-slate-500">
                     <LockIcon />
                   </span>
-                  <input id="confirm-password" type="password" placeholder="Confirm your password" className={`${inputClassName} pl-11 pr-11`} />
+                  <input
+                    id="confirm-password"
+                    type="password"
+                    autoComplete="new-password"
+                    required
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="Confirm your password"
+                    className={`${inputClassName} pl-11 pr-11`}
+                  />
                 </div>
               </div>
 
               <button
-                type="button"
-                className="group inline-flex h-14 w-full items-center justify-center gap-3 rounded-2xl bg-[linear-gradient(135deg,#7c3aed_0%,#6d28d9_50%,#4f46e5_100%)] px-5 text-sm font-semibold text-white shadow-[0_16px_40px_rgba(109,40,217,0.3)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_20px_50px_rgba(109,40,217,0.38)] active:translate-y-0 active:scale-[0.99]"
+                type="submit"
+                disabled={registerMutation.isPending || registerMutation.isSuccess}
+                className="group inline-flex h-14 w-full items-center justify-center gap-3 rounded-2xl bg-[linear-gradient(135deg,#7c3aed_0%,#6d28d9_50%,#4f46e5_100%)] px-5 text-sm font-semibold text-white shadow-[0_16px_40px_rgba(109,40,217,0.3)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_20px_50px_rgba(109,40,217,0.38)] active:translate-y-0 active:scale-[0.99] disabled:opacity-60 disabled:pointer-events-none"
               >
-                <span>Create Account</span>
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/15 transition-transform duration-200 group-hover:translate-x-0.5">
-                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} aria-hidden="true">
-                    <path d="M5 12h12" />
-                    <path d="m13 6 6 6-6 6" />
-                  </svg>
-                </span>
+                {registerMutation.isPending ? (
+                  <span className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                ) : (
+                  <>
+                    <span>Create Account</span>
+                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/15 transition-transform duration-200 group-hover:translate-x-0.5">
+                      <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} aria-hidden="true">
+                        <path d="M5 12h12" />
+                        <path d="m13 6 6 6-6 6" />
+                      </svg>
+                    </span>
+                  </>
+                )}
               </button>
 
               <p className="pt-2 text-center text-sm text-slate-500">
                 Already have an account?{' '}
                 <button
                   type="button"
-                  onClick={() => navigate('/login')}
+                  onClick={() => navigate(ROUTES.LOGIN)}
                   className="font-semibold text-brand-700 transition-colors hover:text-brand-800"
                 >
                   Sign In
                 </button>
               </p>
-            </div>
+            </form>
           </div>
         </section>
       </div>

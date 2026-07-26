@@ -1,0 +1,36 @@
+{
+  // ---------------------------------------------------------------------------
+  // tsconfig.seed.json — TypeScript configuration for prisma/seed.ts only.
+  //
+  // Why a separate tsconfig?
+  // -------------------------
+  // The main tsconfig.json sets "rootDir": "./src", which means the compiler
+  // rejects any file outside src/ (including prisma/seed.ts). Rather than
+  // relaxing the production tsconfig, we use a scoped config that:
+  //   • includes only the seed file and the src/ modules it imports
+  //   • skips output generation (tsx runs the file directly, no compile step)
+  //   • inherits all strictness settings from tsconfig.base.json
+  //
+  // The "exactOptionalPropertyTypes" and "noUncheckedIndexedAccess" flags from
+  // the main tsconfig are intentionally kept so the seed is held to the same
+  // type-safety standard as production code.
+  // ---------------------------------------------------------------------------
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "noEmit": true,
+    "exactOptionalPropertyTypes": true,
+    "noUncheckedIndexedAccess": true
+  },
+  "include": [
+    "prisma/seed.ts",
+    "src/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "coverage",
+    "tests",
+    "src/generated"
+  ]
+}

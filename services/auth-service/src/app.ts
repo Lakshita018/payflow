@@ -100,7 +100,7 @@ export function createApp(): Application {
     max: config.RATE_LIMIT_AUTH_MAX,
     standardHeaders: true,  // Return rate limit info in `RateLimit-*` headers
     legacyHeaders: false,   // Disable the `X-RateLimit-*` headers
-    message: { status: 429, message: 'Too many requests, please try again later.' },
+    message: { error: 'Too many requests. Please wait a few minutes and try again.' },
   });
 
   // ── Swagger UI ────────────────────────────────────────────────────────────

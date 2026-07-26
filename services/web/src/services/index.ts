@@ -1,1 +1,2 @@
-// Services barrel — API call wrappers go here in later phases.
+// Services barrel — export all API service modules here.
+export * as authService from './auth';

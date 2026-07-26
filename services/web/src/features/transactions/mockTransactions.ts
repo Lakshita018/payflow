@@ -1,5 +1,5 @@
 import { jsPDF } from 'jspdf';
-import type { TransactionItem, TransactionKind } from './types';
+import type { TransactionItem } from './types';
 
 export interface TransactionRecord extends TransactionItem {
   contactLabel: 'From' | 'To';

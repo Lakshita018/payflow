@@ -1,1 +1,2 @@
-// Shared hooks barrel — custom hooks go here in later phases.
+// Shared hooks barrel — export all custom hooks here.
+export { useAuth, useLoginMutation, useRegisterMutation, useLogout } from './useAuth';

@@ -1,5 +1,5 @@
-import { PageContainer } from '@/layouts/PageContainer';
+import { FavouriteContactsPage } from '@/features/recipients/favourites/FavouriteContactsPage';
 
 export function FavouritesPage() {
-  return <PageContainer title="Favourites" subtitle="Your saved contacts."><></></PageContainer>;
+  return <FavouriteContactsPage />;
 }

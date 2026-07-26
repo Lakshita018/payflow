@@ -174,7 +174,8 @@ export function TransactionDetailsPage() {
   };
 
   const handleBack = () => {
-    if ((window.history.state as { idx?: number } | null)?.idx && (window.history.state as { idx?: number }).idx > 0) {
+    const historyState = window.history.state as { idx?: number } | null;
+    if (historyState?.idx != null && historyState.idx > 0) {
       navigate(-1);
       return;
     }
@@ -217,7 +218,7 @@ export function TransactionDetailsPage() {
     }
 
     try {
-      await navigator.clipboard.writeText(summary);
+      await (navigator as Navigator & { clipboard: Clipboard }).clipboard.writeText(summary);
       showToast('Transaction copied');
     } catch {
       const textArea = document.createElement('textarea');

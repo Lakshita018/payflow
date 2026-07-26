@@ -1,5 +1,5 @@
-import { PageContainer } from '@/layouts/PageContainer';
+import { SendMoneyPage } from '@/features/transfer/SendMoneyPage';
 
 export function TransferPage() {
-  return <PageContainer title="Transfer Money" subtitle="Send money to another PayFlow user."><></></PageContainer>;
+  return <SendMoneyPage />;
 }
