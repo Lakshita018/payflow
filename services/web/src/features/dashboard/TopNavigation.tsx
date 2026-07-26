@@ -21,8 +21,9 @@ const pageMeta: Record<string, { title: string; subtitle: string }> = {
 
 export function TopNavigation({ onMenuClick }: TopNavigationProps) {
   const { pathname } = useLocation();
-  const meta = pathname.startsWith('/transactions/')
-    ? { title: 'Transaction Details', subtitle: 'This screen will be implemented in a future phase.' }
+  const isTransactionDetails = pathname.startsWith('/transactions/');
+  const meta = isTransactionDetails
+    ? null
     : pageMeta[pathname] ?? pageMeta[ROUTES.DASHBOARD];
 
   return (
@@ -38,9 +39,13 @@ export function TopNavigation({ onMenuClick }: TopNavigationProps) {
             <MenuIcon className="h-5 w-5" />
           </button>
 
-          <div className="min-w-0 flex-1">
-            <PageHeader title={meta.title} subtitle={meta.subtitle} />
-          </div>
+          {meta ? (
+            <div className="min-w-0 flex-1">
+              <PageHeader title={meta.title} subtitle={meta.subtitle} />
+            </div>
+          ) : (
+            <div className="hidden min-w-0 flex-1 lg:block" />
+          )}
 
           <div className="hidden min-w-0 flex-1 items-center justify-end gap-3 lg:flex xl:flex-[0.95]">
             <div className="w-full max-w-[22rem]">
