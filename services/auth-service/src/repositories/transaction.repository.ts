@@ -279,4 +279,100 @@ export class TransactionRepository {
       .slice(0, limit)
       .map(([contactId, data]) => ({ contactId, ...data }));
   }
+
+  // ---------------------------------------------------------------------------
+  // Returns all TRANSFER transactions between two specific users (both sides),
+  // ordered newest-first. Used by the user-profile relationship endpoint.
+  // ---------------------------------------------------------------------------
+  findBetweenUsers(
+    userAId: string,
+    userBId: string,
+    limit?: number,
+  ): Promise<TransactionWithDetails[]> {
+    // Each transfer produces two DB rows: one DEBIT (sender) + one CREDIT (receiver).
+    // We pick exactly one row per transfer from userA's perspective:
+    //   • A sent to B  → show the DEBIT row  (senderId=A, direction=DEBIT)
+    //   • B sent to A  → show the CREDIT row (receiverId=A, direction=CREDIT)
+    // This mirrors the same pattern used in findByUserWithDetails.
+    return this.db.transaction.findMany({
+      where: {
+        type: 'TRANSFER',
+        OR: [
+          { senderId: userAId, receiverId: userBId, direction: 'DEBIT' },
+          { senderId: userBId, receiverId: userAId, direction: 'CREDIT' },
+        ],
+      },
+      orderBy: { createdAt: 'desc' },
+      ...(limit !== undefined ? { take: limit } : {}),
+      select: {
+        id: true,
+        amount: true,
+        status: true,
+        type: true,
+        direction: true,
+        note: true,
+        createdAt: true,
+        senderId: true,
+        receiverId: true,
+        sender: { select: { email: true, payflowId: true } },
+        receiver: { select: { email: true, payflowId: true } },
+      },
+    });
+  }
+
+  // Returns aggregate stats between two users:
+  //   totalSentByA    — amount A sent to B (COMPLETED only)
+  //   totalReceivedByA — amount A received from B (COMPLETED only)
+  //   transactionCount — total TRANSFER rows between them
+  //   lastInteractionAt — most recent createdAt, or null
+  async statsBetweenUsers(
+    userAId: string,
+    userBId: string,
+  ): Promise<{
+    totalSentByA: string;
+    totalReceivedByA: string;
+    transactionCount: number;
+    lastInteractionAt: Date | null;
+  }> {
+    const [sentAgg, receivedAgg, countResult, latestRow] = await Promise.all([
+      // A → B: count only the DEBIT row (sender's copy) to avoid doubling
+      this.db.transaction.aggregate({
+        where: { senderId: userAId, receiverId: userBId, type: 'TRANSFER', status: 'COMPLETED', direction: 'DEBIT' },
+        _sum: { amount: true },
+      }),
+      // B → A: count only the CREDIT row (receiver's copy) to avoid doubling
+      this.db.transaction.aggregate({
+        where: { senderId: userBId, receiverId: userAId, type: 'TRANSFER', status: 'COMPLETED', direction: 'CREDIT' },
+        _sum: { amount: true },
+      }),
+      // Count uses the same direction filter to avoid double-counting.
+      this.db.transaction.count({
+        where: {
+          type: 'TRANSFER',
+          OR: [
+            { senderId: userAId, receiverId: userBId, direction: 'DEBIT' },
+            { senderId: userBId, receiverId: userAId, direction: 'CREDIT' },
+          ],
+        },
+      }),
+      this.db.transaction.findFirst({
+        where: {
+          type: 'TRANSFER',
+          OR: [
+            { senderId: userAId, receiverId: userBId, direction: 'DEBIT' },
+            { senderId: userBId, receiverId: userAId, direction: 'CREDIT' },
+          ],
+        },
+        orderBy: { createdAt: 'desc' },
+        select: { createdAt: true },
+      }),
+    ]);
+
+    return {
+      totalSentByA: (sentAgg._sum.amount ?? new Prisma.Decimal(0)).toFixed(2),
+      totalReceivedByA: (receivedAgg._sum.amount ?? new Prisma.Decimal(0)).toFixed(2),
+      transactionCount: countResult,
+      lastInteractionAt: latestRow?.createdAt ?? null,
+    };
+  }
 }

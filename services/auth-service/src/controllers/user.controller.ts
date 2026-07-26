@@ -17,6 +17,8 @@ export class UserController {
     this.addFavourite    = this.addFavourite.bind(this);
     this.removeFavourite = this.removeFavourite.bind(this);
     this.getFavourites   = this.getFavourites.bind(this);
+    this.getUserProfile  = this.getUserProfile.bind(this);
+    this.getRelationship = this.getRelationship.bind(this);
   }
 
   // GET /api/v1/users/payflow/:payflowId
@@ -85,6 +87,36 @@ export class UserController {
     try {
       if (!req.user) { throw new UnauthorizedError(); }
       const result = await this.userService.getFavourites(req.user.id);
+      res.status(StatusCodes.OK).json(result);
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  // GET /api/v1/users/:payflowId/profile
+  // 200 OK → UserProfileResult
+  async getUserProfile(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.user) { throw new UnauthorizedError(); }
+      const result = await this.userService.getUserProfile(
+        req.params.payflowId as string,
+        req.user.id,
+      );
+      res.status(StatusCodes.OK).json(result);
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  // GET /api/v1/users/:payflowId/relationship
+  // 200 OK → RelationshipResult
+  async getRelationship(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.user) { throw new UnauthorizedError(); }
+      const result = await this.userService.getRelationship(
+        req.params.payflowId as string,
+        req.user.id,
+      );
       res.status(StatusCodes.OK).json(result);
     } catch (err) {
       next(err);

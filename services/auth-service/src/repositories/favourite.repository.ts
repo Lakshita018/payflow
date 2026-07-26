@@ -38,4 +38,13 @@ export class FavouriteContactRepository {
     });
     return rows.map((r) => r.contactUserId);
   }
+
+  // Returns true if userId has contactUserId in their favourites.
+  async isFavourite(userId: string, contactUserId: string): Promise<boolean> {
+    const row = await this.db.favouriteContact.findUnique({
+      where: { userId_contactUserId: { userId, contactUserId } },
+      select: { id: true },
+    });
+    return row !== null;
+  }
 }

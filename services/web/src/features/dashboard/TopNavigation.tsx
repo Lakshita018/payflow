@@ -3,8 +3,9 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import Avatar from '@/components/ui/Avatar';
 import Input from '@/components/ui/Input';
 import PageHeader from '@/components/ui/PageHeader';
-import { ROUTES } from '@/routes/paths';
+import { ROUTES, userProfilePath } from '@/routes/paths';
 import { useAuthStore } from '@/store';
+import { userService } from '@/services';
 import { BellIcon, MenuIcon, SearchIcon } from './icons';
 
 type TopNavigationProps = {
@@ -36,29 +37,52 @@ const staticPageTitles: Record<string, string> = {
   [ROUTES.SETTINGS]:     'Settings',
 };
 
+function isUserProfilePath(pathname: string): boolean {
+  return /^\/users\/[^/]+$/.test(pathname);
+}
+
 export function TopNavigation({ onMenuClick }: TopNavigationProps) {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
   const displayName = user?.email?.split('@')[0] ?? user?.payflowId?.split('@')[0] ?? 'there';
   const [searchValue, setSearchValue] = useState('');
+  const [searchError, setSearchError] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
+
+  const handleSearch = async (q: string) => {
+    if (!q) return;
+    setIsSearching(true);
+    setSearchError('');
+    try {
+      // Validate user exists before navigating
+      await userService.getUserProfile(q);
+      setSearchValue('');
+      setSearchError('');
+      void navigate(userProfilePath(q));
+    } catch {
+      setSearchError('No user found');
+    } finally {
+      setIsSearching(false);
+    }
+  };
 
   const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       const q = searchValue.trim();
       if (!q) return;
-      setSearchValue('');
-      void navigate(ROUTES.SEND_MONEY, { state: { prefillPayflowId: q } });
+      void handleSearch(q);
     }
   };
 
   const isTransactionDetails = pathname.startsWith('/transactions/') && pathname !== ROUTES.TRANSACTIONS;
+  const isUserProfile = isUserProfilePath(pathname);
 
   let title: string;
   let subtitle: string;
 
-  if (isTransactionDetails) {
+  if (isTransactionDetails || isUserProfile) {
     title = '';
     subtitle = '';
   } else if (pathname === ROUTES.DASHBOARD) {
@@ -69,7 +93,7 @@ export function TopNavigation({ onMenuClick }: TopNavigationProps) {
     subtitle = staticPageMeta[pathname]?.subtitle ?? '';
   }
 
-  const showMeta = !isTransactionDetails && title;
+  const showMeta = !isTransactionDetails && !isUserProfile && title;
 
   return (
     <header className="sticky top-0 z-20 border-b border-border/70 bg-surface/90 backdrop-blur-xl">
@@ -94,16 +118,24 @@ export function TopNavigation({ onMenuClick }: TopNavigationProps) {
 
           <div className="hidden min-w-0 flex-1 items-center justify-end gap-3 lg:flex xl:flex-[0.95]">
             <div className="w-full max-w-[22rem]">
-              <Input
-                ref={searchRef}
-                aria-label="Search contacts by PayFlow ID"
-                placeholder="Search by PayFlow ID…"
-                leftIcon={<SearchIcon className="h-4 w-4" />}
-                className="h-11 rounded-2xl border-border bg-white px-4 text-sm shadow-sm"
-                value={searchValue}
-                onChange={(e) => setSearchValue(e.target.value)}
-                onKeyDown={handleSearchKeyDown}
-              />
+              <div className="relative">
+                <Input
+                  ref={searchRef}
+                  aria-label="Search contacts by PayFlow ID, name or email"
+                  placeholder="Search by PayFlow ID, name or email…"
+                  leftIcon={isSearching
+                    ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
+                    : <SearchIcon className="h-4 w-4" />}
+                  className="h-11 rounded-2xl border-border bg-white px-4 text-sm shadow-sm"
+                  value={searchValue}
+                  onChange={(e) => { setSearchValue(e.target.value); setSearchError(''); }}
+                  onKeyDown={handleSearchKeyDown}
+                  disabled={isSearching}
+                />
+                {searchError && (
+                  <p className="absolute left-0 top-full mt-1 text-xs font-medium text-danger">{searchError}</p>
+                )}
+              </div>
             </div>
 
             <button
@@ -120,16 +152,24 @@ export function TopNavigation({ onMenuClick }: TopNavigationProps) {
 
         <div className="mt-4 flex items-center gap-3 lg:hidden">
           <div className="flex-1">
+            <div className="relative">
               <Input
-                aria-label="Search contacts by PayFlow ID"
-                placeholder="Search by PayFlow ID…"
-                leftIcon={<SearchIcon className="h-4 w-4" />}
+                aria-label="Search contacts by PayFlow ID, name or email"
+                placeholder="Search by PayFlow ID, name or email…"
+                leftIcon={isSearching
+                  ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
+                  : <SearchIcon className="h-4 w-4" />}
                 className="h-11 rounded-2xl border-border bg-white px-4 text-sm shadow-sm"
                 value={searchValue}
-                onChange={(e) => setSearchValue(e.target.value)}
+                onChange={(e) => { setSearchValue(e.target.value); setSearchError(''); }}
                 onKeyDown={handleSearchKeyDown}
+                disabled={isSearching}
               />
+              {searchError && (
+                <p className="absolute left-0 top-full mt-1 text-xs font-medium text-danger">{searchError}</p>
+              )}
             </div>
+          </div>
 
           <button
             type="button"

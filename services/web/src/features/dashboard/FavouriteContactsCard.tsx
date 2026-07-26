@@ -3,7 +3,7 @@ import Avatar from '@/components/ui/Avatar';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
 import EmptyState from '@/components/ui/EmptyState';
-import { ROUTES } from '@/routes/paths';
+import { ROUTES, userProfilePath } from '@/routes/paths';
 import { ChevronRightIcon } from './icons';
 import { useNavigate } from 'react-router-dom';
 import { userService } from '@/services';
@@ -44,7 +44,7 @@ export function FavouriteContactsCard() {
             <button
               key={contact.payflowId}
               type="button"
-              onClick={() => navigate(ROUTES.SEND_MONEY)}
+              onClick={() => navigate(userProfilePath(contact.payflowId))}
               className="group flex w-full items-center gap-4 px-4 py-4 text-left transition-all duration-150 hover:bg-surface-muted/60"
             >
               <Avatar name={contact.displayName} size="md" className="bg-brand-100 text-brand-700" />

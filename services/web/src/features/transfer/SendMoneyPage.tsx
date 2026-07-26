@@ -1,4 +1,5 @@
-import { useState, type SVGProps } from 'react';
+import { useState, useEffect, type SVGProps } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Avatar from '@/components/ui/Avatar';
 import Button from '@/components/ui/Button';
@@ -148,9 +149,15 @@ function SuccessModal({ receiverName, receiverPayflowId, amount, onAddFavourite,
 
 export function SendMoneyPage() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
+
+  // Read prefilled PayFlow ID from navigation state (set by User Profile → Send Money)
+  const location = useLocation();
+  const prefillId: string = (location.state as { prefillPayflowId?: string } | null)?.prefillPayflowId ?? '';
+
   // Recipient lookup
-  const [payflowIdInput, setPayflowIdInput] = useState('');
-  const [lookupQuery, setLookupQuery] = useState('');
+  const [payflowIdInput, setPayflowIdInput] = useState(prefillId);
+  const [lookupQuery, setLookupQuery] = useState(prefillId);
   const [recipientConfirmed, setRecipientConfirmed] = useState(false);
 
   // Amount & note
@@ -185,6 +192,13 @@ export function SendMoneyPage() {
     staleTime: 60_000,
   });
 
+  // Auto-confirm recipient when prefilled from user profile page (already validated there)
+  useEffect(() => {
+    if (prefillId && recipient && !recipientConfirmed) {
+      setRecipientConfirmed(true);
+    }
+  }, [prefillId, recipient, recipientConfirmed]);
+
   // Wallet balance
   const { data: wallet } = useQuery({
     queryKey: ['wallet', 'balance'],
@@ -195,13 +209,28 @@ export function SendMoneyPage() {
   const transferMutation = useMutation({
     mutationFn: transactionService.transfer,
     onSuccess: (result) => {
+      // Invalidate all queries that need to reflect the new transfer.
+      // Do this immediately in onSuccess so the profile page's queries are
+      // already marked stale before we navigate back to it.
       void queryClient.invalidateQueries({ queryKey: ['wallet'] });
       void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
       void queryClient.invalidateQueries({ queryKey: ['transactions'] });
       void queryClient.invalidateQueries({ queryKey: ['recent-contacts'] });
-      const formatted = '₹' + (parseFloat(rawAmount) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+      // Invalidate the target user's profile + relationship caches so the
+      // profile page refetches fresh data the moment it mounts.
+      if (prefillId) {
+        void queryClient.invalidateQueries({ queryKey: ['user-profile', prefillId] });
+        void queryClient.invalidateQueries({ queryKey: ['user-relationship', prefillId] });
+      }
+      // Also cover the case where the recipient was typed manually (no prefillId)
+      if (result.receiverPayflowId) {
+        void queryClient.invalidateQueries({ queryKey: ['user-profile', result.receiverPayflowId] });
+        void queryClient.invalidateQueries({ queryKey: ['user-relationship', result.receiverPayflowId] });
+      }
+
+      const formatted = '₹' + (parseFloat(rawAmount.replace(/,/g, '')) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       setSuccessData({ receiverName: result.receiverName, receiverPayflowId: result.receiverPayflowId, amount: formatted });
-      // Store the payflowId so we can look up the UUID for favourite
       setLastReceiverContactId(result.receiverPayflowId);
       setAddedFavourite(false);
       setTransferError('');
@@ -260,6 +289,18 @@ export function SendMoneyPage() {
   };
 
   const handleDone = () => {
+    // If we came from a user profile page, prefetch the now-stale profile data
+    // then navigate so the profile page renders with fresh data immediately
+    // (no skeleton flash, no stale totals).
+    const returnId = prefillId || lastReceiverContactId;
+    if (returnId) {
+      // Fire background refetches for both profile queries. They were already
+      // invalidated in onSuccess, so these calls hit the network right away.
+      void queryClient.refetchQueries({ queryKey: ['user-relationship', returnId] });
+      void queryClient.refetchQueries({ queryKey: ['user-profile', returnId] });
+      void navigate(`/users/${encodeURIComponent(returnId)}`, { replace: true });
+      return;
+    }
     setSuccessData(null);
     setPayflowIdInput('');
     setLookupQuery('');

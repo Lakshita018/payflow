@@ -56,6 +56,34 @@ export interface RecentContact {
   transactionCount: number;
 }
 
+// Shape returned by GET /users/:payflowId/profile
+export interface UserProfileResult {
+  displayName: string;
+  payflowId: string;
+  email: string;
+  avatar: null;
+  isFavourite: boolean;
+}
+
+// Shape returned by GET /users/:payflowId/relationship
+export interface RelationshipResult {
+  isFavourite: boolean;
+  totalSent: string;       // amount current user sent to this user
+  totalReceived: string;   // amount current user received from this user
+  transactionCount: number;
+  lastInteractionAt: string | null;
+  recentTransactions: RelationshipTransaction[];
+}
+
+export interface RelationshipTransaction {
+  id: string;
+  amount: string;
+  direction: 'DEBIT' | 'CREDIT'; // relative to the requesting user
+  note: string | null;
+  createdAt: string;
+  status: string;
+}
+
 // ---------------------------------------------------------------------------
 // UserService
 // ---------------------------------------------------------------------------
@@ -178,5 +206,58 @@ export class UserService {
         };
       })
       .filter((p): p is PublicProfile => p !== null);
+  }
+
+  // ── User profile (public, with favourite status) ───────────────────────────
+  // GET /users/:payflowId/profile
+  async getUserProfile(payflowId: string, requestingUserId: string): Promise<UserProfileResult> {
+    const user = await this.userRepository.findByPayflowId(payflowId);
+    if (user === null) {
+      throw new NotFoundError(`No user found with PayFlow ID: ${payflowId}`);
+    }
+    const isFav = await this.favouriteRepository.isFavourite(requestingUserId, user.id);
+    return {
+      displayName: displayNameFrom(user.payflowId),
+      payflowId: user.payflowId,
+      email: user.email,
+      avatar: null,
+      isFavourite: isFav,
+    };
+  }
+
+  // ── Relationship summary ───────────────────────────────────────────────────
+  // GET /users/:payflowId/relationship
+  // Returns transaction stats + recent transactions between the requesting
+  // user and the target user only.
+  async getRelationship(payflowId: string, requestingUserId: string): Promise<RelationshipResult> {
+    const target = await this.userRepository.findByPayflowId(payflowId);
+    if (target === null) {
+      throw new NotFoundError(`No user found with PayFlow ID: ${payflowId}`);
+    }
+
+    const [stats, transactions, isFav] = await Promise.all([
+      this.transactionRepository.statsBetweenUsers(requestingUserId, target.id),
+      this.transactionRepository.findBetweenUsers(requestingUserId, target.id, 20),
+      this.favouriteRepository.isFavourite(requestingUserId, target.id),
+    ]);
+
+    const recentTransactions: RelationshipTransaction[] = transactions.map((tx) => ({
+      id: tx.id,
+      amount: tx.amount.toFixed(2),
+      // From requesting user's perspective: if they sent it → DEBIT, else → CREDIT
+      direction: tx.senderId === requestingUserId ? 'DEBIT' : 'CREDIT',
+      note: tx.note,
+      createdAt: tx.createdAt.toISOString(),
+      status: tx.status,
+    }));
+
+    return {
+      isFavourite: isFav,
+      totalSent: stats.totalSentByA,
+      totalReceived: stats.totalReceivedByA,
+      transactionCount: stats.transactionCount,
+      lastInteractionAt: stats.lastInteractionAt ? stats.lastInteractionAt.toISOString() : null,
+      recentTransactions,
+    };
   }
 }

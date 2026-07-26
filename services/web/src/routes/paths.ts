@@ -15,4 +15,10 @@ export const ROUTES = {
   FAVOURITES:   '/favourites',
   PROFILE:      '/profile',
   SETTINGS:     '/settings',
+  USER_PROFILE: '/users/:payflowId',
 } as const;
+
+// Helper to build a concrete user-profile URL from a payflowId.
+export function userProfilePath(payflowId: string): string {
+  return `/users/${encodeURIComponent(payflowId)}`;
+}

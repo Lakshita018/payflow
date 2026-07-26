@@ -54,3 +54,15 @@ userRouter.delete('/favourites/:contactUserId', (req, res, next) => { void auth(
 userRouter.get('/payflow/:payflowId', (req, res, next) => { void auth(req, res, next); }, (req, res, next) => {
   void userController.lookupRecipient(req, res, next);
 });
+
+// GET  /api/v1/users/:payflowId/profile
+// Full public profile of the specified user (with isFavourite relative to caller).
+userRouter.get('/:payflowId/profile', (req, res, next) => { void auth(req, res, next); }, (req, res, next) => {
+  void userController.getUserProfile(req, res, next);
+});
+
+// GET  /api/v1/users/:payflowId/relationship
+// Transaction relationship between the caller and the specified user.
+userRouter.get('/:payflowId/relationship', (req, res, next) => { void auth(req, res, next); }, (req, res, next) => {
+  void userController.getRelationship(req, res, next);
+});

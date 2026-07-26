@@ -80,6 +80,33 @@ export interface RecentContact extends PublicProfile {
   transactionCount: number;
 }
 
+// ── User Profile & Relationship ──────────────────────────────────────────────
+export interface UserProfileResult {
+  displayName: string;
+  payflowId: string;
+  email: string;
+  avatar: null;
+  isFavourite: boolean;
+}
+
+export interface RelationshipTransaction {
+  id: string;
+  amount: string;
+  direction: 'DEBIT' | 'CREDIT';
+  note: string | null;
+  createdAt: string;
+  status: string;
+}
+
+export interface RelationshipResult {
+  isFavourite: boolean;
+  totalSent: string;
+  totalReceived: string;
+  transactionCount: number;
+  lastInteractionAt: string | null;
+  recentTransactions: RelationshipTransaction[];
+}
+
 // ── API error envelope ───────────────────────────────────────────────────────
 export interface ApiError {
   error: string;
