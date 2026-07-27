@@ -81,3 +81,42 @@ export async function me(): Promise<MeResponse> {
   const { data } = await apiClient.get<MeResponse>('/api/v1/auth/me');
   return data;
 }
+
+// ── Password Reset ───────────────────────────────────────────────────────────
+
+export interface ForgotPasswordRequest {
+  email: string;
+}
+
+export interface ForgotPasswordResponse {
+  message: string;
+}
+
+export interface ResetPasswordRequest {
+  token: string;
+  password: string;
+}
+
+export interface ResetPasswordResponse {
+  message: string;
+}
+
+/**
+ * POST /api/v1/auth/forgot-password
+ * Always returns a generic success message — the backend never reveals
+ * whether an account exists for the given email.
+ */
+export async function forgotPassword(payload: ForgotPasswordRequest): Promise<ForgotPasswordResponse> {
+  const { data } = await apiClient.post<ForgotPasswordResponse>('/api/v1/auth/forgot-password', payload);
+  return data;
+}
+
+/**
+ * POST /api/v1/auth/reset-password
+ * Verifies the one-time token and sets the new password.
+ * Throws on 400 (invalid/expired token or validation failure).
+ */
+export async function resetPassword(payload: ResetPasswordRequest): Promise<ResetPasswordResponse> {
+  const { data } = await apiClient.post<ResetPasswordResponse>('/api/v1/auth/reset-password', payload);
+  return data;
+}

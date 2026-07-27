@@ -67,6 +67,31 @@ const envSchema = z.object({
   // Do not go below 10. Do not exceed 16 in production without benchmarking.
   BCRYPT_SALT_ROUNDS: z.coerce.number().int().min(10).max(20).default(12),
 
+  // ── Email / SMTP ──────────────────────────────────────────────────────────
+  // Used exclusively for transactional emails (password reset).
+  // All four SMTP_* vars are required when email sending is enabled.
+  // Leave blank to disable email sending (useful for local dev without SMTP).
+  //
+  // Gmail SMTP example:
+  //   SMTP_HOST=smtp.gmail.com
+  //   SMTP_PORT=465
+  //   SMTP_USER=you@gmail.com
+  //   SMTP_PASS=your-app-password   (NOT your Google account password)
+  //   EMAIL_FROM="PayFlow <no-reply@payflow.io>"
+  //
+  // To swap providers (SendGrid, Mailgun, etc.) change only these vars.
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.coerce.number().int().positive().optional(),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASS: z.string().optional(),
+  EMAIL_FROM: z.string().default('PayFlow <no-reply@payflow.io>'),
+
+  // ── Frontend URL ──────────────────────────────────────────────────────────
+  // Used to construct the password-reset deep-link sent in emails.
+  // Must NOT have a trailing slash.
+  // Example: https://app.payflow.io
+  FRONTEND_URL: z.string().url().default('http://localhost:5173'),
+
   // ── Logging ───────────────────────────────────────────────────────────────
   // Pino log level. Use 'info' in production and 'debug' locally when tracing
   // request flows. 'trace' is very verbose — development only.

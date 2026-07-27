@@ -119,9 +119,11 @@ export function createApp(): Application {
 
   // ── Routes ───────────────────────────────────────────────────────────────
   app.use('/', healthRouter);
-  app.use('/api/v1/auth/login', authRateLimiter);
-  app.use('/api/v1/auth/register', authRateLimiter);
-  app.use('/api/v1/auth/refresh', authRateLimiter);
+  app.use('/api/v1/auth/login',           authRateLimiter);
+  app.use('/api/v1/auth/register',        authRateLimiter);
+  app.use('/api/v1/auth/refresh',         authRateLimiter);
+  app.use('/api/v1/auth/forgot-password', authRateLimiter);
+  app.use('/api/v1/auth/reset-password',  authRateLimiter);
   app.use('/api/v1/auth', authRouter);
   app.use('/api/v1/wallets', walletRouter);
   app.use('/api/v1/transactions', transactionRouter);

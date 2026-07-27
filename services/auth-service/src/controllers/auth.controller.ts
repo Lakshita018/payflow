@@ -29,6 +29,8 @@ export class AuthController {
     this.refreshToken = this.refreshToken.bind(this);
     this.logout = this.logout.bind(this);
     this.me = this.me.bind(this);
+    this.forgotPassword = this.forgotPassword.bind(this);
+    this.resetPassword = this.resetPassword.bind(this);
   }
 
   // ── POST /auth/register ────────────────────────────────────────────────────
@@ -106,6 +108,37 @@ export class AuthController {
     try {
       if (!req.user) { throw new UnauthorizedError(); }
       const result = await this.authService.getMe(req.user.id);
+      res.status(StatusCodes.OK).json(result);
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  // ── POST /auth/forgot-password ─────────────────────────────────────────────
+  // Body: { email }
+  // 200 OK  → { message } — generic message regardless of whether the email exists
+  //                          (email enumeration defence)
+  async forgotPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const result = await this.authService.forgotPassword({
+        email: req.body.email as string,
+      });
+      res.status(StatusCodes.OK).json(result);
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  // ── POST /auth/reset-password ──────────────────────────────────────────────
+  // Body: { token, password }
+  // 200 OK  → { message }
+  // 400     → invalid / expired token, or validation failure
+  async resetPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const result = await this.authService.resetPassword({
+        token:    req.body.token as string,
+        password: req.body.password as string,
+      });
       res.status(StatusCodes.OK).json(result);
     } catch (err) {
       next(err);

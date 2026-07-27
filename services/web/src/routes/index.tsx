@@ -2,10 +2,11 @@
 // Application router — declares all routes using React Router v6.
 //
 // Structure:
-//   /        → redirect to /dashboard
-//   Guest    (GuestRoute)    — login, register; redirects authenticated users to /dashboard
-//   App      (ProtectedRoute) — all authenticated pages; redirects guests to /login
-//   *        → 404
+//   /              → redirect to /dashboard
+//   Guest          (GuestRoute)    — login, register; redirects authenticated users to /dashboard
+//   Public auth    (no guard)      — forgot-password, reset-password; accessible by anyone
+//   App            (ProtectedRoute) — all authenticated pages; redirects guests to /login
+//   *              → 404
 // ---------------------------------------------------------------------------
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { ROUTES } from './paths';
@@ -19,6 +20,8 @@ import { DashboardLayout } from '@/layouts/DashboardLayout';
 // Pages
 import { LoginPage }               from '@/pages/LoginPage';
 import { RegisterPage }            from '@/pages/RegisterPage';
+import { ForgotPasswordPage }      from '@/pages/ForgotPasswordPage';
+import { ResetPasswordPage }       from '@/pages/ResetPasswordPage';
 import { DashboardPage }           from '@/pages/DashboardPage';
 import { ProfilePage }             from '@/pages/ProfilePage';
 import { TransactionsPage }        from '@/pages/TransactionsPage';
@@ -50,6 +53,19 @@ export const router = createBrowserRouter([
           { path: ROUTES.REGISTER, element: <RegisterPage /> },
         ],
       },
+    ],
+  },
+
+  // ── Public auth routes — no authentication guard ───────────────────────────
+  // Forgot-password and reset-password must be reachable by unauthenticated
+  // users (they don't have a token yet) AND by authenticated users who want to
+  // change their password.  We render them inside AuthLayout for consistent
+  // styling but outside any route guard.
+  {
+    element: <AuthLayout />,
+    children: [
+      { path: ROUTES.FORGOT_PASSWORD, element: <ForgotPasswordPage /> },
+      { path: ROUTES.RESET_PASSWORD,  element: <ResetPasswordPage /> },
     ],
   },
 

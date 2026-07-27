@@ -104,6 +104,38 @@ const components: OpenAPIV3.ComponentsObject = {
         userId: { $ref: '#/components/schemas/UuidV4' },
       },
     },
+    ForgotPasswordRequest: {
+      type: 'object',
+      required: ['email'],
+      properties: {
+        email: { type: 'string', format: 'email', example: 'alice@example.com' },
+      },
+    },
+    ResetPasswordRequest: {
+      type: 'object',
+      required: ['token', 'password'],
+      properties: {
+        token: {
+          type: 'string',
+          description: 'Raw 64-character hex reset token from the email link',
+          example: 'a3f1c8...64hex...chars',
+        },
+        password: {
+          type: 'string',
+          minLength: 8,
+          maxLength: 128,
+          description: 'New password (min 8 characters)',
+          example: 'NewP@ssw0rd!',
+        },
+      },
+    },
+    GenericMessageResponse: {
+      type: 'object',
+      required: ['message'],
+      properties: {
+        message: { type: 'string', example: 'Operation completed successfully.' },
+      },
+    },
 
     // ── Wallet ────────────────────────────────────────────────────────────
     WalletResponse: {
@@ -405,6 +437,50 @@ const paths: OpenAPIV3.PathsObject = {
       responses: {
         '204': { description: 'Logged out successfully' },
         '401': { $ref: '#/components/responses/Unauthorized' },
+      },
+    },
+  },
+  '/api/v1/auth/forgot-password': {
+    post: {
+      tags: ['Auth'],
+      summary: 'Request password reset',
+      description:
+        'Accepts an email address and, if an account exists, sends a password-reset link to that address. ' +
+        'Always returns the same generic 200 response to prevent email enumeration. ' +
+        'The reset token is a cryptographically secure random value (crypto.randomBytes(32)); ' +
+        'only its SHA-256 hash is stored. Tokens expire after 15 minutes.',
+      requestBody: {
+        required: true,
+        content: { 'application/json': { schema: { $ref: '#/components/schemas/ForgotPasswordRequest' } } },
+      },
+      responses: {
+        '200': {
+          description: 'Generic success — same body whether or not the email exists',
+          content: { 'application/json': { schema: { $ref: '#/components/schemas/GenericMessageResponse' } } },
+        },
+        '400': { $ref: '#/components/responses/BadRequest' },
+      },
+    },
+  },
+  '/api/v1/auth/reset-password': {
+    post: {
+      tags: ['Auth'],
+      summary: 'Reset password',
+      description:
+        'Verifies the one-time reset token (raw hex value from the email link), ' +
+        'hashes the new password with bcrypt, updates the stored hash, ' +
+        'clears the reset token so it cannot be reused, and invalidates all active ' +
+        'refresh tokens (session invalidation).',
+      requestBody: {
+        required: true,
+        content: { 'application/json': { schema: { $ref: '#/components/schemas/ResetPasswordRequest' } } },
+      },
+      responses: {
+        '200': {
+          description: 'Password updated successfully',
+          content: { 'application/json': { schema: { $ref: '#/components/schemas/GenericMessageResponse' } } },
+        },
+        '400': { $ref: '#/components/responses/BadRequest' },
       },
     },
   },

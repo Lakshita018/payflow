@@ -14,14 +14,17 @@
 // This keeps the service unit-testable: tests inject a mock repository and
 // assert on service behaviour without touching a real database.
 // ---------------------------------------------------------------------------
+import crypto from 'crypto';
 import bcrypt from 'bcrypt';
 import { UserRepository } from '../repositories/user.repository';
 import { WalletRepository } from '../repositories/wallet.repository';
-import { ConflictError, InternalServerError, UnauthorizedError, NotFoundError } from '../utils/errors';
-import { registerSchema, loginSchema } from '../validators/auth.validator';
+import { ConflictError, InternalServerError, UnauthorizedError, NotFoundError, BadRequestError } from '../utils/errors';
+import { registerSchema, loginSchema, forgotPasswordSchema, resetPasswordSchema } from '../validators/auth.validator';
 import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from '../utils/jwt';
 import { config } from '../config/env';
 import { generatePayflowId } from '../utils/payflow-id';
+import { emailService } from './email/email.service';
+import { logger } from '../config/logger';
 
 // ---------------------------------------------------------------------------
 // Input / output types
@@ -62,6 +65,23 @@ export interface LogoutInput {
 export interface AuthTokens {
   accessToken: string;
   refreshToken: string;
+}
+
+export interface ForgotPasswordInput {
+  email: string;
+}
+
+export interface ForgotPasswordResult {
+  message: string;
+}
+
+export interface ResetPasswordInput {
+  token: string;
+  password: string;
+}
+
+export interface ResetPasswordResult {
+  message: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -212,6 +232,95 @@ export class AuthService {
     // 2. Clear the refresh token hash — any subsequent refresh attempt will
     //    fail at the "hash is null" guard in refreshToken().
     await this.userRepository.clearRefreshTokenHash(user.id);
+  }
+
+  // ── Forgot Password ───────────────────────────────────────────────────────
+  // Security: Always returns the same generic message regardless of whether
+  // the email exists — this prevents email enumeration attacks.
+  async forgotPassword(input: ForgotPasswordInput): Promise<ForgotPasswordResult> {
+    // 1. Validate input format
+    const { email } = forgotPasswordSchema.parse(input);
+
+    // 2. Generic message used for all cases (email found or not found)
+    const GENERIC_RESPONSE: ForgotPasswordResult = {
+      message: "If an account exists for this email, a password reset link has been sent.",
+    };
+
+    // 3. Look up user — if not found, return the generic response immediately
+    //    without revealing that no account exists.
+    const user = await this.userRepository.findByEmail(email);
+    if (user === null) {
+      return GENERIC_RESPONSE;
+    }
+
+    // 4. Generate a cryptographically secure 32-byte random token.
+    //    The raw token (hex string) is sent in the email link.
+    //    Only its SHA-256 hash is stored in the database — never the raw value.
+    const rawToken  = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+
+    // 5. Compute expiry — 15 minutes from now.
+    const expiry = new Date(Date.now() + 15 * 60 * 1000);
+
+    // 6. Persist the hash + expiry, overwriting any previous reset request.
+    //    A new request always invalidates the prior token.
+    await this.userRepository.setPasswordResetToken(user.id, tokenHash, expiry);
+
+    // 7. Build the reset URL — points the user to the frontend reset-password page.
+    const resetUrl = `${config.FRONTEND_URL}/reset-password?token=${rawToken}`;
+
+    // 8. Derive a friendly display name from the payflowId
+    //    (e.g. "alice1234@payflow" → "alice1234").
+    const displayName = user.payflowId.split('@')[0] ?? user.payflowId;
+
+    // 9. Send the email.  We catch SMTP failures here so that they do not
+    //    prevent the generic 200 response from being returned — but we do log
+    //    the error so it can be investigated.
+    try {
+      await emailService.sendPasswordReset({ to: user.email, displayName, resetUrl });
+    } catch (err) {
+      logger.error(
+        { err, userId: user.id },
+        '[AuthService] forgotPassword — email delivery failed; token was still persisted',
+      );
+      // Intentionally NOT re-throwing — the token is valid; the user can
+      // request another link or the admin can investigate the SMTP failure.
+    }
+
+    return GENERIC_RESPONSE;
+  }
+
+  // ── Reset Password ────────────────────────────────────────────────────────
+  async resetPassword(input: ResetPasswordInput): Promise<ResetPasswordResult> {
+    // 1. Validate input
+    const { token, password } = resetPasswordSchema.parse(input);
+
+    // 2. Hash the incoming raw token and compare against the stored hash.
+    //    We never store or compare the raw token — only its SHA-256 digest.
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+
+    // 3. Find a user with a matching, non-expired token via the repository.
+    const user = await this.userRepository.findByValidResetToken(tokenHash);
+
+    // 4. Invalid or expired token — use a generic error to avoid leaking info.
+    if (user === null) {
+      throw new BadRequestError('This password reset link is invalid or has expired.');
+    }
+
+    // 5. Hash the new password
+    const passwordHash = await bcrypt.hash(password, config.BCRYPT_SALT_ROUNDS);
+
+    // 6. Update the password AND clear the refresh token hash in a single DB
+    //    write.  Clearing the refresh token hash forces all active sessions to
+    //    re-authenticate — this is the session-invalidation step.
+    await this.userRepository.updatePassword(user.id, passwordHash);
+
+    // 7. Clear the reset token + expiry so the link cannot be used again.
+    //    Performed AFTER the password update so a crash between the two steps
+    //    does not leave the user with a new password but a still-valid token.
+    await this.userRepository.clearPasswordResetToken(user.id);
+
+    return { message: 'Your password has been reset successfully. Please log in with your new password.' };
   }
 
   // ── Get current user (me) ─────────────────────────────────────────────────

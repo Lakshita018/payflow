@@ -5,29 +5,6 @@ import type { AxiosError } from 'axios';
 import type { ApiError } from '@/types';
 import { ROUTES } from '@/routes/paths';
 
-const socialButtonClassName =
-  'inline-flex h-12 w-full items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 shadow-sm transition-all duration-200 hover:border-slate-300 hover:bg-slate-50 hover:shadow-md active:scale-[0.99]';
-
-function GoogleMark() {
-  return (
-    <svg className="h-5 w-5" viewBox="0 0 24 24" aria-hidden="true">
-      <path fill="#EA4335" d="M12 10.2v3.95h5.63c-.25 1.36-1.07 2.51-2.2 3.28v2.73h3.55C20.98 18.44 22 15.45 22 12.06c0-.72-.06-1.41-.17-2.06H12Z" />
-      <path fill="#34A853" d="M6.58 14.28l-.71.54-2.51 1.95A9.96 9.96 0 0 0 12 22c2.76 0 5.08-.91 6.77-2.46l-3.55-2.73c-.98.66-2.24 1.05-3.22 1.05-2.48 0-4.58-1.67-5.34-3.92Z" />
-      <path fill="#FBBC05" d="M3.36 6.98A9.94 9.94 0 0 0 2 12c0 1.61.39 3.13 1.08 4.47l3.5-2.72a5.93 5.93 0 0 1-.31-1.75c0-.61.1-1.2.31-1.75L3.36 6.98Z" />
-      <path fill="#4285F4" d="M12 5.92c1.5 0 2.85.52 3.92 1.53l2.94-2.94A9.95 9.95 0 0 0 12 2C8.17 2 4.83 4.2 3.36 6.98l3.5 2.73c.76-2.25 2.86-3.79 5.14-3.79Z" />
-    </svg>
-  );
-}
-
-function AppleMark() {
-  return (
-    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M16.37 12.47c.02-2.05 1.69-3.03 1.77-3.08-.94-1.37-2.39-1.56-2.91-1.58-1.24-.13-2.43.73-3.06.73-.63 0-1.61-.71-2.65-.69-1.37.02-2.63.8-3.33 2.04-1.42 2.45-.36 6.08 1 8.06.68.97 1.48 2.07 2.54 2.03 1.01-.04 1.39-.65 2.61-.65s1.57.65 2.65.63c1.1-.02 1.79-.99 2.46-1.96.78-1.12 1.1-2.21 1.11-2.27-.03-.01-2.14-.83-2.19-3.26Z" />
-      <path d="M14.38 5.74c.55-.66.92-1.57.82-2.49-.79.03-1.76.52-2.33 1.17-.51.57-.96 1.49-.84 2.39.89.07 1.8-.45 2.35-1.07Z" />
-    </svg>
-  );
-}
-
 function LockIcon() {
   return (
     <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} aria-hidden="true">
@@ -272,11 +249,13 @@ export function LoginPage() {
                   <label className="block text-sm font-medium text-slate-700" htmlFor="password">
                     Password
                   </label>
+                  {/* Forgot Password link — navigates to the dedicated page */}
                   <button
                     type="button"
+                    onClick={() => navigate(ROUTES.FORGOT_PASSWORD)}
                     className="text-sm font-medium text-brand-700 transition-colors hover:text-brand-800"
                   >
-                    Forgot Password
+                    Forgot Password?
                   </button>
                 </div>
                 <div className="group relative">
@@ -304,7 +283,7 @@ export function LoginPage() {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between gap-4 text-sm">
+              <div className="flex items-center gap-4 text-sm">
                 <label className="flex items-center gap-3 text-slate-600">
                   <span className="relative flex items-center">
                     <input
@@ -345,25 +324,6 @@ export function LoginPage() {
                   </>
                 )}
               </button>
-
-              <div className="flex items-center gap-4 py-2">
-                <div className="h-px flex-1 bg-gradient-to-r from-transparent via-slate-200 to-transparent" />
-                <span className="text-xs font-medium uppercase tracking-[0.24em] text-slate-400">
-                  or continue with
-                </span>
-                <div className="h-px flex-1 bg-gradient-to-r from-transparent via-slate-200 to-transparent" />
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-2">
-                <button type="button" className={socialButtonClassName}>
-                  <GoogleMark />
-                  <span>Google</span>
-                </button>
-                <button type="button" className={socialButtonClassName}>
-                  <AppleMark />
-                  <span>Apple</span>
-                </button>
-              </div>
 
               <p className="pt-2 text-center text-sm text-slate-500">
                 Don&apos;t have an account?{' '}

@@ -135,6 +135,22 @@ export function useInitAuth() {
   }, [error, accessToken, logout]);
 }
 
+// ── Forgot Password ──────────────────────────────────────────────────────────
+
+export function useForgotPasswordMutation() {
+  return useMutation({
+    mutationFn: authService.forgotPassword,
+  });
+}
+
+// ── Reset Password ───────────────────────────────────────────────────────────
+
+export function useResetPasswordMutation() {
+  return useMutation({
+    mutationFn: authService.resetPassword,
+  });
+}
+
 // ── Convenience re-export ────────────────────────────────────────────────────
 // Consumers can import everything from a single hook if they prefer.
 

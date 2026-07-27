@@ -8,13 +8,17 @@ datasource db {
 }
 
 model User {
-  id                   String             @id @default(uuid())
-  email                String             @unique
-  payflowId            String             @unique
-  passwordHash         String
-  refreshTokenHash     String?
-  createdAt            DateTime           @default(now())
-  updatedAt            DateTime           @updatedAt
+  id                      String             @id @default(uuid())
+  email                   String             @unique
+  payflowId               String             @unique
+  passwordHash            String
+  refreshTokenHash        String?
+  /// SHA-256 hex hash of the raw reset token (never stored in plaintext)
+  passwordResetToken      String?
+  /// UTC expiry for the reset token — null when no reset is pending
+  passwordResetExpiry     DateTime?
+  createdAt               DateTime           @default(now())
+  updatedAt               DateTime           @updatedAt
   favouritedBy         FavouriteContact[] @relation("FavouritedUsers")
   favourites           FavouriteContact[] @relation("UserFavourites")
   receivedTransactions Transaction[]      @relation("ReceivedTransactions")

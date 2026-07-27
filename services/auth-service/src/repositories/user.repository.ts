@@ -12,11 +12,15 @@
 //
 // Method contracts
 // ----------------
-//   create()                 — inserts a new user row; throws on duplicate email (P2002)
-//   findByEmail()            — returns User | null; never throws on not-found
-//   findById()               — returns User | null; never throws on not-found
-//   updateRefreshTokenHash() — sets refreshTokenHash to the provided value
-//   clearRefreshTokenHash()  — sets refreshTokenHash to null (logout)
+//   create()                      — inserts a new user row; throws on duplicate email (P2002)
+//   findByEmail()                 — returns User | null; never throws on not-found
+//   findById()                    — returns User | null; never throws on not-found
+//   updateRefreshTokenHash()      — sets refreshTokenHash to the provided value
+//   clearRefreshTokenHash()       — sets refreshTokenHash to null (logout)
+//   setPasswordResetToken()       — stores SHA-256 hash + expiry; overwrites any prior token
+//   clearPasswordResetToken()     — nullifies token + expiry after successful reset
+//   updatePassword()              — updates passwordHash and clears the refresh token hash
+//                                   (invalidates all active sessions after a password reset)
 // ---------------------------------------------------------------------------
 import { PrismaClient, User } from '../generated/prisma/client';
 
@@ -127,6 +131,63 @@ export class UserRepository {
     return this.db.user.update({
       where: { id },
       data: { refreshTokenHash: null },
+    });
+  }
+
+  // ── Password reset token management ───────────────────────────────────────
+
+  // Stores the SHA-256 hex hash of the raw reset token together with its
+  // expiry timestamp.  Any previous reset token is overwritten — a new
+  // request always invalidates the prior one (single-use-per-request design).
+  async setPasswordResetToken(
+    id: string,
+    tokenHash: string,
+    expiry: Date,
+  ): Promise<User> {
+    return this.db.user.update({
+      where: { id },
+      data: {
+        passwordResetToken:  tokenHash,
+        passwordResetExpiry: expiry,
+      },
+    });
+  }
+
+  // Clears the reset token and expiry so the token can never be used again.
+  // Called immediately after a successful password reset.
+  async clearPasswordResetToken(id: string): Promise<User> {
+    return this.db.user.update({
+      where: { id },
+      data: {
+        passwordResetToken:  null,
+        passwordResetExpiry: null,
+      },
+    });
+  }
+
+  // Updates the user's passwordHash and simultaneously clears the refresh
+  // token hash.  Clearing the refresh token forces all active sessions to
+  // re-authenticate after a password reset (session invalidation).
+  async updatePassword(id: string, passwordHash: string): Promise<User> {
+    return this.db.user.update({
+      where: { id },
+      data: {
+        passwordHash,
+        // Clearing the refresh token hash invalidates any active "remember me"
+        // sessions — the user must log in again with the new password.
+        refreshTokenHash: null,
+      },
+    });
+  }
+
+  // Finds the user whose stored SHA-256 token hash matches AND whose expiry
+  // is still in the future.  Returns null if no valid token exists.
+  async findByValidResetToken(tokenHash: string): Promise<User | null> {
+    return this.db.user.findFirst({
+      where: {
+        passwordResetToken:  tokenHash,
+        passwordResetExpiry: { gt: new Date() },
+      },
     });
   }
 }
