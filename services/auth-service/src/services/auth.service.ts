@@ -267,7 +267,7 @@ export class AuthService {
     await this.userRepository.setPasswordResetToken(user.id, tokenHash, expiry);
 
     // 7. Build the reset URL — points the user to the frontend reset-password page.
-    const resetUrl = `${config.FRONTEND_URL}/reset-password?token=${rawToken}`;
+    const resetUrl = `${config.FRONTEND_URL}/reset-pwd?token=${rawToken}`;
 
     // 8. Derive a friendly display name from the payflowId
     //    (e.g. "alice1234@payflow" → "alice1234").
