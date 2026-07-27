@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { motion } from 'framer-motion';
 import Avatar from '@/components/ui/Avatar';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
@@ -10,8 +11,9 @@ import { useNavigate } from 'react-router-dom';
 import { transactionService } from '@/services';
 import type { Transaction } from '@/types';
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
 function formatAmount(tx: Transaction): { text: string; kind: 'received' | 'sent' } {
-  // direction is the authoritative field: CREDIT = money in, DEBIT = money out
   const isCredit = tx.direction === 'CREDIT';
   const num = parseFloat(tx.amount);
   const formatted = '₹' + num.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -22,23 +24,35 @@ function formatAmount(tx: Transaction): { text: string; kind: 'received' | 'sent
 }
 
 function getCounterpartyName(tx: Transaction): string {
-  if (tx.type === 'ADD_MONEY') return 'Added to wallet';
-  // DEBIT row → sender is self, counterparty is receiver
+  if (tx.type === 'ADD_MONEY') return 'Wallet Top-up';
   if (tx.direction === 'DEBIT') {
     return tx.receiverPayflowId?.split('@')[0] ?? tx.receiverPayflowId ?? 'Unknown';
   }
-  // CREDIT row → receiver is self, counterparty is sender
   return tx.senderPayflowId?.split('@')[0] ?? tx.senderPayflowId ?? 'Unknown';
+}
+
+function getSubLabel(tx: Transaction, kind: 'received' | 'sent'): string {
+  if (tx.type === 'ADD_MONEY') return 'Wallet top-up';
+  if (tx.note) return tx.note;
+  return kind === 'received' ? 'Payment received' : 'Transfer sent';
 }
 
 function formatDate(dateStr: string): string {
   const date = new Date(dateStr);
   const now = new Date();
   const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
-  if (diffDays === 0) return 'Today, ' + date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
-  if (diffDays === 1) return 'Yesterday, ' + date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+  const time = date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+  if (diffDays === 0) return `Today, ${time}`;
+  if (diffDays === 1) return `Yesterday, ${time}`;
   return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
 }
+
+const rowVariants = {
+  hidden: { opacity: 0, y: 5 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.22, ease: 'easeOut' as const } },
+};
+
+// ── RecentTransactionsCard ────────────────────────────────────────────────────
 
 export function RecentTransactionsCard() {
   const navigate = useNavigate();
@@ -51,20 +65,22 @@ export function RecentTransactionsCard() {
   const recentTransactions = dashboard?.recentTransactions ?? [];
 
   return (
-    <Card variant="elevated" className="h-full p-6 sm:p-7">
+    <Card variant="elevated" className="h-full p-5 sm:p-6">
+      {/* Header */}
       <div className="flex items-center justify-between gap-4">
-        <p className="text-lg font-semibold tracking-tight text-text-primary">Recent Transactions</p>
+        <p className="text-base font-semibold text-text-primary">Recent Transactions</p>
         <button
           type="button"
           onClick={() => navigate(ROUTES.TRANSACTIONS)}
-          className="text-sm font-medium text-brand-700 transition-colors hover:text-brand-800"
+          className="text-xs font-semibold text-brand-600 transition-colors hover:text-brand-700"
         >
-          View all
+          View all →
         </button>
       </div>
 
+      {/* Empty state */}
       {recentTransactions.length === 0 ? (
-        <div className="mt-6">
+        <div className="mt-5">
           <EmptyState
             title="No transactions yet"
             description="Add money to your wallet or send money to get started."
@@ -72,58 +88,83 @@ export function RecentTransactionsCard() {
           />
         </div>
       ) : (
-        <div className="mt-6 divide-y divide-border overflow-hidden rounded-[1.5rem] border border-border bg-surface">
-          {recentTransactions.map((tx) => {
-            const { text: amountText, kind } = formatAmount(tx);
-            const counterparty = getCounterpartyName(tx);
-            const description = tx.type === 'ADD_MONEY' ? 'Wallet top-up' : (tx.note ?? 'Transfer');
-            return (
-              <div
-                key={tx.id}
-                className="flex items-center gap-4 px-4 py-4 transition-all duration-150 hover:bg-surface-muted/60 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.5)]"
-              >
-                <Avatar
-                  name={counterparty}
-                  size="md"
-                  className={kind === 'received' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}
-                />
-
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold text-text-primary">
-                    {tx.type === 'ADD_MONEY' ? 'Wallet Top-up' : (kind === 'received' ? `From ${counterparty}` : `To ${counterparty}`)}
-                  </p>
-                  <p className="truncate text-sm text-text-muted">{description}</p>
-                </div>
-
-                <div className="hidden shrink-0 text-right md:block">
-                  <p className="text-sm text-text-secondary">{formatDate(tx.createdAt as unknown as string)}</p>
-                </div>
-
-                <div className="flex shrink-0 flex-col items-end gap-1 text-right">
-                  <p className={['text-sm font-semibold', kind === 'received' ? 'text-success' : 'text-danger'].join(' ')}>
-                    {amountText}
-                  </p>
-                  <Badge variant={kind === 'received' ? 'success' : 'danger'} className="px-2.5 py-1">
-                    {tx.type === 'ADD_MONEY' ? 'Added' : (kind === 'received' ? 'Received' : 'Sent')}
-                  </Badge>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {recentTransactions.length > 0 && (
-        <div className="mt-6 flex justify-center">
-          <Button
-            variant="ghost"
-            onClick={() => navigate(ROUTES.TRANSACTIONS)}
-            className="group gap-2 rounded-full px-4 py-2 text-brand-700 transition-all duration-200 hover:bg-brand-50 hover:underline underline-offset-4"
-            rightIcon={<ArrowUpRightIcon className="h-4 w-4" />}
+        <>
+          {/* Transaction rows */}
+          <motion.div
+            className="mt-4 divide-y divide-border/60 overflow-hidden rounded-2xl border border-border bg-surface"
+            initial="hidden"
+            animate="visible"
+            variants={{ visible: { transition: { staggerChildren: 0.07 } } }}
           >
-            View All Transactions
-          </Button>
-        </div>
+            {recentTransactions.map((tx) => {
+              const { text: amountText, kind } = formatAmount(tx);
+              const counterparty = getCounterpartyName(tx);
+              const subLabel = getSubLabel(tx, kind);
+              const label = tx.type === 'ADD_MONEY'
+                ? 'Wallet Top-up'
+                : (kind === 'received' ? `From ${counterparty}` : `To ${counterparty}`);
+
+              return (
+                <motion.div
+                  key={tx.id}
+                  variants={rowVariants}
+                  className="flex items-center gap-3 px-4 py-3.5 transition-colors hover:bg-surface-muted/50"
+                >
+                  {/* Avatar */}
+                  <Avatar
+                    name={counterparty}
+                    size="md"
+                    className={[
+                      'shrink-0',
+                      kind === 'received'
+                        ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                        : 'bg-rose-50 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400',
+                    ].join(' ')}
+                  />
+
+                  {/* Name + sub-label */}
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-text-primary">{label}</p>
+                    <p className="truncate text-xs text-text-muted">{subLabel}</p>
+                  </div>
+
+                  {/* Date — desktop only */}
+                  <p className="hidden shrink-0 text-right text-[11px] text-text-muted sm:block">
+                    {formatDate(tx.createdAt as unknown as string)}
+                  </p>
+
+                  {/* Amount + badge */}
+                  <div className="flex shrink-0 flex-col items-end gap-1">
+                    <p className={[
+                      'text-sm font-semibold tabular-nums',
+                      kind === 'received' ? 'text-success' : 'text-danger',
+                    ].join(' ')}>
+                      {amountText}
+                    </p>
+                    <Badge
+                      variant={kind === 'received' ? 'success' : 'danger'}
+                      className="px-2 py-0.5 text-[10px] leading-tight"
+                    >
+                      {tx.type === 'ADD_MONEY' ? 'Added' : (kind === 'received' ? 'Received' : 'Sent')}
+                    </Badge>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </motion.div>
+
+          {/* View all CTA */}
+          <div className="mt-4 flex justify-center">
+            <Button
+              variant="ghost"
+              onClick={() => navigate(ROUTES.TRANSACTIONS)}
+              className="gap-1.5 text-sm text-brand-600 hover:bg-brand-50"
+              rightIcon={<ArrowUpRightIcon className="h-4 w-4" />}
+            >
+              View All Transactions
+            </Button>
+          </div>
+        </>
       )}
     </Card>
   );

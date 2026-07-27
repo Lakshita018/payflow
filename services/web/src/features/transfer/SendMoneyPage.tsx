@@ -317,11 +317,6 @@ export function SendMoneyPage() {
 
   return (
     <div className="mx-auto w-full max-w-7xl">
-      <div className="mb-6">
-        <h2 className="text-2xl font-semibold tracking-tight text-text-primary">Send Money</h2>
-        <p className="mt-1 text-sm text-text-secondary">Send money securely to any PayFlow user</p>
-      </div>
-
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
         {/* ── Left column ────────────────────────────────────────────────── */}
         <div className="space-y-4">

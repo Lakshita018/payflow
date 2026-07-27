@@ -17,6 +17,13 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:3001',
         changeOrigin: true,
+        // Preserve percent-encoded characters (e.g. %40 for @) in path params.
+        // Without this, some proxy versions re-encode or mis-handle special chars.
+        configure: (proxy) => {
+          proxy.on('proxyReq', (proxyReq, req) => {
+            if (req.url) proxyReq.path = req.url;
+          });
+        },
       },
     },
   },

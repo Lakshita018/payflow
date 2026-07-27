@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { motion } from 'framer-motion';
 import Avatar from '@/components/ui/Avatar';
 import Badge from '@/components/ui/Badge';
 import Card from '@/components/ui/Card';
@@ -38,10 +39,16 @@ export function ProfilePage() {
   const favCount = favourites.length;
 
   return (
-    <PageContainer title="Profile" subtitle="Manage your PayFlow account.">
-      <div className="grid gap-6 xl:grid-cols-3">
+    <PageContainer>
+      <motion.div
+        className="grid gap-5 xl:grid-cols-3"
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.25 }}
+      >
+        {/* Main profile card */}
         <Card variant="elevated" className="xl:col-span-2">
-          <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-4">
               <Avatar name={user?.email ?? 'User'} size="xl" className="bg-brand-100 text-brand-700" />
               <div>
@@ -49,37 +56,52 @@ export function ProfilePage() {
                   <h2 className="text-xl font-semibold text-text-primary">{displayName}</h2>
                   <Badge variant="success">Active</Badge>
                 </div>
-                <p className="mt-1 text-sm text-text-secondary">{user?.email ?? '—'}</p>
-                <p className="mt-1 text-sm text-text-muted">{payflowId}</p>
+                <p className="mt-0.5 text-sm text-text-secondary">{user?.email ?? '—'}</p>
+                <p className="mt-0.5 text-xs text-text-muted font-mono">{payflowId}</p>
               </div>
             </div>
 
-            <div className="rounded-2xl bg-surface-muted px-4 py-3">
-              <p className="text-xs font-medium uppercase tracking-[0.2em] text-text-muted">PayFlow ID</p>
-              <p className="mt-1 text-sm font-semibold text-text-primary">{payflowId}</p>
+            {/* PayFlow ID chip */}
+            <div className="rounded-xl border border-border bg-surface-subtle px-4 py-3 sm:text-right">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">PayFlow ID</p>
+              <p className="mt-1 text-sm font-semibold text-text-primary font-mono">{payflowId}</p>
             </div>
           </div>
 
-          <div className="mt-6 grid gap-4 sm:grid-cols-2">
-            <div className="rounded-2xl border border-border bg-surface p-4">
-              <p className="text-sm font-medium text-text-secondary">Primary Wallet</p>
-              <p className="mt-2 text-2xl font-semibold text-text-primary">{balanceDisplay}</p>
-              <p className="mt-1 text-sm text-text-muted">Available balance</p>
+          {/* Mini stats */}
+          <div className="mt-5 grid gap-4 sm:grid-cols-2">
+            <div className="rounded-xl border border-border bg-surface p-4">
+              <p className="text-xs font-medium uppercase tracking-wide text-text-muted">Primary Wallet</p>
+              <p className="mt-2 text-2xl font-semibold text-text-primary tabular-nums">{balanceDisplay}</p>
+              <p className="mt-0.5 text-xs text-text-muted">Available balance</p>
             </div>
-            <div className="rounded-2xl border border-border bg-surface p-4">
-              <p className="text-sm font-medium text-text-secondary">Account Status</p>
+            <div className="rounded-xl border border-border bg-surface p-4">
+              <p className="text-xs font-medium uppercase tracking-wide text-text-muted">Account Status</p>
               <p className="mt-2 text-2xl font-semibold text-text-primary">Active</p>
-              <p className="mt-1 text-sm text-text-muted">Wallet verified</p>
+              <p className="mt-0.5 text-xs text-text-muted">Wallet verified</p>
             </div>
           </div>
         </Card>
 
+        {/* Stat cards */}
         <div className="grid gap-4 sm:grid-cols-3 xl:grid-cols-1">
-          <StatCard title="Wallet Balance" value={balanceDisplay} description="Primary wallet" />
-          <StatCard title="Transactions" value={String(txCount)} description="All-time activity" />
-          <StatCard title="Favourite Contacts" value={String(favCount)} description="Saved recipients" />
+          <StatCard
+            title="Wallet Balance"
+            value={balanceDisplay}
+            description="Primary wallet"
+          />
+          <StatCard
+            title="Transactions"
+            value={String(txCount)}
+            description="All-time activity"
+          />
+          <StatCard
+            title="Favourite Contacts"
+            value={String(favCount)}
+            description="Saved recipients"
+          />
         </div>
-      </div>
+      </motion.div>
     </PageContainer>
   );
 }

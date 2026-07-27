@@ -29,3 +29,5 @@ export type { LoadingSpinnerProps, SpinnerSize } from './LoadingSpinner';
 
 export { default as LoadingSkeleton, CardSkeleton, ListSkeleton, TableRowSkeleton } from './LoadingSkeleton';
 export type { LoadingSkeletonProps } from './LoadingSkeleton';
+
+export { ThemeToggle } from './ThemeToggle';

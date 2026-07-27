@@ -1,6 +1,8 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { motion } from 'framer-motion';
 import Button from '@/components/ui/Button';
+import { TableRowSkeleton } from '@/components/ui/LoadingSkeleton';
 import { TransactionFilters, type FilterOption } from '@/features/transactions/TransactionFilters';
 import { TransactionSearch } from '@/features/transactions/TransactionSearch';
 import { TransactionTable } from '@/features/transactions/TransactionTable';
@@ -8,15 +10,10 @@ import { transactionService } from '@/services';
 import type { Transaction } from '@/types';
 import type { TransactionRecord } from '@/features/transactions/mockTransactions';
 
-// Converts a backend Transaction to the display shape TransactionTable expects.
-// direction is the authoritative field: CREDIT = money in, DEBIT = money out.
 function toTransactionRecord(tx: Transaction): TransactionRecord {
   const isAddMoney = tx.type === 'ADD_MONEY';
   const isCredit = tx.direction === 'CREDIT';
 
-  // For ADD_MONEY the counterparty is "wallet"; for TRANSFER:
-  //   DEBIT  → sender is self, counterparty is receiver
-  //   CREDIT → receiver is self, counterparty is sender
   const counterpartyPayflowId = isAddMoney
     ? 'wallet'
     : (isCredit ? tx.senderPayflowId : tx.receiverPayflowId);
@@ -102,41 +99,48 @@ export function TransactionsPage() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-6">
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+    <motion.div
+      className="mx-auto w-full max-w-7xl space-y-5"
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+    >
+      {/* Search + Date range */}
+      <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
         <TransactionSearch />
-        <div className="flex justify-start lg:justify-end">
-          <Button variant="secondary" className="h-11 rounded-2xl px-4 text-sm font-semibold">
-            Select Date Range
-          </Button>
-        </div>
+        <Button variant="secondary" className="h-10 rounded-xl px-4 text-sm font-medium">
+          Date Range
+        </Button>
       </div>
 
+      {/* Filters */}
       <TransactionFilters activeFilter={activeFilter} onFilterChange={handleFilterChange} />
 
+      {/* Table */}
       {isLoading ? (
-        <div className="flex items-center justify-center py-20 text-text-muted text-sm">Loading transactions…</div>
+        <TableRowSkeleton rows={8} cols={5} />
       ) : (
         <TransactionTable transactions={paged} />
       )}
 
+      {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+        <div className="flex flex-wrap items-center justify-center gap-1.5 pt-1">
           <Button
             variant="ghost"
             size="sm"
-            className="rounded-full px-4 text-text-secondary hover:bg-surface-muted"
+            className="rounded-xl px-3 text-text-secondary"
             onClick={() => setPage((p) => Math.max(1, p - 1))}
             disabled={page === 1}
           >
-            Previous
+            ← Prev
           </Button>
           {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
             <Button
               key={p}
               variant={p === page ? 'primary' : 'ghost'}
               size="sm"
-              className="rounded-full px-4"
+              className="min-w-[2rem] rounded-xl px-3"
               onClick={() => setPage(p)}
             >
               {p}
@@ -145,14 +149,14 @@ export function TransactionsPage() {
           <Button
             variant="ghost"
             size="sm"
-            className="rounded-full px-4 text-text-secondary hover:bg-surface-muted"
+            className="rounded-xl px-3 text-text-secondary"
             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
             disabled={page === totalPages}
           >
-            Next
+            Next →
           </Button>
         </div>
       )}
-    </div>
+    </motion.div>
   );
 }

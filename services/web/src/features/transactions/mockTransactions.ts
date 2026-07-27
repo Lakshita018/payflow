@@ -195,178 +195,177 @@ export function createTransactionSummary(transaction: TransactionRecord): string
 export function createReceiptPdfBlob(transaction: TransactionRecord): Blob {
   const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
 
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const pageHeight = doc.internal.pageSize.getHeight();
-  const marginX = 16;
-  const contentWidth = pageWidth - (marginX * 2);
-  const purple = [109, 74, 255] as const;
-  const success = [22, 163, 74] as const;
-  const danger = [220, 38, 38] as const;
-  const border = [226, 229, 239] as const;
-  const muted = [96, 102, 125] as const;
-  const text = [30, 35, 52] as const;
+  const W  = doc.internal.pageSize.getWidth();   // 210
+  const H  = doc.internal.pageSize.getHeight();  // 297
+  const mx = 18;                                  // horizontal margin
+  const cw = W - mx * 2;                         // content width = 174
+  const rEdge = mx + cw;                         // right edge = 192
 
-  const currentDateTime = new Intl.DateTimeFormat('en-IN', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(new Date());
+  // ── Palette ────────────────────────────────────────────────────────────────
+  const purple    = [109, 58, 238] as const;   // brand
+  const purpleSft = [237, 232, 255] as const;  // light purple tint
+  const ink       = [20,  17,  45] as const;   // near-black text
+  const mid       = [90,  85, 120] as const;   // secondary text
+  const muted     = [160, 155, 185] as const;  // label text
+  const border    = [228, 224, 242] as const;  // card borders
+  const green     = [22, 140, 75 ] as const;
+  const greenSft  = [236, 253, 243] as const;
+  const red       = [200, 30,  30 ] as const;
+  const redSft    = [255, 240, 240] as const;
 
-  const isReceived = transaction.kind === 'received';
-  const accent = isReceived ? success : danger;
-  const accentSoft = isReceived ? [236, 253, 243] as const : [255, 241, 241] as const;
+  const isReceived  = transaction.kind === 'received';
+  const accent      = isReceived ? green   : red;
+  const accentSoft  = isReceived ? greenSft : redSft;
   const statusLabel = isReceived ? 'PAYMENT RECEIVED' : 'PAYMENT SENT';
-  const amountLabel = `INR ${transaction.amountValue.replace(/^₹\s?/, '')}`;
-  const feeLabel = 'INR 0.00';
+  const amountStr   = transaction.amountValue.replace(/^[+\-\s₹]+/, '').trim();
+  const amountLabel = `INR ${amountStr}`;
+  const signedLabel = `${isReceived ? '+' : '−'} INR ${amountStr}`;
 
-  const drawCard = (x: number, y: number, w: number, h: number, fill: readonly [number, number, number] = [255, 255, 255]) => {
-    doc.setFillColor(fill[0], fill[1], fill[2]);
-    doc.setDrawColor(border[0], border[1], border[2]);
-    doc.setLineWidth(0.3);
+  const now = new Intl.DateTimeFormat('en-IN', { dateStyle: 'long', timeStyle: 'short' }).format(new Date());
+
+  // ── Primitives ─────────────────────────────────────────────────────────────
+  const rgb    = (c: readonly [number,number,number]) => doc.setTextColor(c[0], c[1], c[2]);
+  const fill   = (c: readonly [number,number,number]) => doc.setFillColor(c[0], c[1], c[2]);
+  const stroke = (c: readonly [number,number,number]) => doc.setDrawColor(c[0], c[1], c[2]);
+  const lw     = (w: number)                          => doc.setLineWidth(w);
+
+  /** White card with a hairline border */
+  const card = (x: number, y: number, w: number, h: number) => {
+    fill([255,255,255] as const); stroke(border); lw(0.25);
     doc.roundedRect(x, y, w, h, 4, 4, 'FD');
   };
 
-  const drawSectionTitle = (x: number, y: number, title: string) => {
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(11.5);
-    doc.setTextColor(text[0], text[1], text[2]);
-    doc.text(title, x, y);
-  };
-
-  const drawInfoRow = (x: number, y: number, label: string, value: string, valueColor: readonly [number, number, number] = text) => {
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9.5);
-    doc.setTextColor(muted[0], muted[1], muted[2]);
-    doc.text(label, x, y);
-
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(valueColor[0], valueColor[1], valueColor[2]);
-    doc.text(value, x + 58, y);
-  };
-
-  const drawPairRow = (
-    x: number,
+  /**
+   * Single label → value row spanning the full card width.
+   * Label is left-aligned; value is right-aligned to rEdge - innerPad.
+   */
+  const row = (
     y: number,
-    leftLabel: string,
-    leftValue: string,
-    rightLabel: string,
-    rightValue: string,
-    rightValueColor: readonly [number, number, number] = text,
+    label: string,
+    value: string,
+    valCol: readonly [number,number,number] = ink,
+    innerPad = 6,
   ) => {
-    const leftValueX = x + 28;
-    const rightLabelX = x + 90;
-    const rightValueX = x + 122;
-
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9.2);
-    doc.setTextColor(muted[0], muted[1], muted[2]);
-    doc.text(leftLabel, x, y);
-    doc.text(rightLabel, rightLabelX, y);
-
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(text[0], text[1], text[2]);
-    doc.text(leftValue, leftValueX, y);
-
-    doc.setTextColor(rightValueColor[0], rightValueColor[1], rightValueColor[2]);
-    doc.text(rightValue, rightValueX, y);
+    const lx = mx + innerPad;
+    const rx = rEdge - innerPad;
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); rgb(muted);
+    doc.text(label, lx, y);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); rgb(valCol);
+    doc.text(value, rx, y, { align: 'right' });
   };
 
-  // Page background.
-  doc.setFillColor(250, 251, 255);
-  doc.rect(0, 0, pageWidth, pageHeight, 'F');
+  /** Hairline divider inside a card */
+  const divider = (y: number, pad = 6) => {
+    stroke(border); lw(0.18);
+    doc.line(mx + pad, y, rEdge - pad, y);
+  };
 
-  // Header.
-  doc.setFillColor(purple[0], purple[1], purple[2]);
-  doc.circle(pageWidth / 2, 22, 7.2, 'F');
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(14);
-  doc.setTextColor(purple[0], purple[1], purple[2]);
-  doc.text('P', pageWidth / 2, 24.3, { align: 'center' });
+  // ── Page ───────────────────────────────────────────────────────────────────
+  fill([252, 251, 255] as const); doc.rect(0, 0, W, H, 'F');
 
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(18);
-  doc.setTextColor(text[0], text[1], text[2]);
-  doc.text('PayFlow', pageWidth / 2, 36, { align: 'center' });
+  // ── Header — clean, centered, minimal ──────────────────────────────────────
+  // Logo circle (purple)
+  fill(purple); stroke(purple); lw(0);
+  doc.circle(W / 2, 20, 7.5, 'F');
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
+  rgb([255,255,255] as const);
+  doc.text('P', W / 2, 23.5, { align: 'center' });
 
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(11);
-  doc.setTextColor(muted[0], muted[1], muted[2]);
-  doc.text('Transaction Receipt', pageWidth / 2, 42, { align: 'center' });
+  // Brand + subtitle
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(16); rgb(ink);
+  doc.text('PayFlow', W / 2, 35, { align: 'center' });
 
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8.5);
-  doc.text('Generated on:', pageWidth / 2, 50, { align: 'center' });
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(text[0], text[1], text[2]);
-  doc.text(currentDateTime, pageWidth / 2, 55, { align: 'center' });
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); rgb(mid);
+  doc.text('Transaction Receipt', W / 2, 42, { align: 'center' });
 
-  // Status section.
-  drawCard(marginX, 64, contentWidth, 48, [255, 255, 255]);
-  doc.setFillColor(accentSoft[0], accentSoft[1], accentSoft[2]);
-  doc.circle(pageWidth / 2, 84, 10, 'F');
-  doc.setDrawColor(accent[0], accent[1], accent[2]);
-  doc.setLineWidth(0.7);
-  doc.circle(pageWidth / 2, 84, 10, 'S');
+  // Thin purple rule under header
+  fill(purple); doc.rect(W / 2 - 14, 45.5, 28, 0.8, 'F');
 
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(accent[0], accent[1], accent[2]);
-  doc.setFontSize(9.5);
-  doc.text(isReceived ? '↓' : '↑', pageWidth / 2, 87, { align: 'center' });
+  // Generated-on line
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); rgb(muted);
+  doc.text(`Generated: ${now}`, W / 2, 51, { align: 'center' });
 
-  doc.setFontSize(12);
-  doc.text(statusLabel, pageWidth / 2, 101, { align: 'center' });
+  // ── Amount hero ────────────────────────────────────────────────────────────
+  const heroY = 58;
+  // Tinted background card
+  fill(accentSoft); stroke(border); lw(0.25);
+  doc.roundedRect(mx, heroY, cw, 36, 4, 4, 'FD');
 
-  doc.setFontSize(16.5);
-  doc.text(`${transaction.amountSign} ${amountLabel}`, pageWidth / 2, 109, { align: 'center' });
+  // Status label (small caps style)
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); rgb(accent);
+  doc.text(statusLabel, W / 2, heroY + 10, { align: 'center' });
 
-  // Details card.
-  drawCard(marginX, 120, contentWidth, 50);
-  drawSectionTitle(marginX + 6, 126, 'Details');
-  doc.setDrawColor(border[0], border[1], border[2]);
-  doc.line(marginX + 6, 129, pageWidth - marginX - 6, 129);
-  drawPairRow(marginX + 8, 138, 'Transaction ID', transaction.transactionId, 'Reference ID', transaction.referenceId);
-  drawPairRow(marginX + 8, 147, 'Date', transaction.summaryDate, 'Time', transaction.summaryTime);
-  drawPairRow(marginX + 8, 156, 'Status', transaction.statusLabel, 'Payment Method', transaction.paymentMethod, accent);
+  // Amount — large, bold, centered
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(22); rgb(accent);
+  doc.text(signedLabel, W / 2, heroY + 26, { align: 'center' });
 
-  // Contact card.
-  drawCard(marginX, 174, contentWidth, 46);
-  drawSectionTitle(marginX + 6, 184, 'Contact Details');
-  doc.line(marginX + 6, 187, pageWidth - marginX - 6, 187);
-  drawPairRow(marginX + 8, 196, 'Name', transaction.name, 'Phone Number', transaction.phone);
-  drawPairRow(marginX + 8, 205, 'Direction', transaction.contactLabel, 'Description', transaction.description);
+  // Date + time below amount
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(8); rgb(accent);
+  doc.text(
+    `${transaction.summaryDate}  ·  ${transaction.summaryTime}`,
+    W / 2, heroY + 33, { align: 'center' },
+  );
 
-  // Amount card.
-  drawCard(marginX, 226, contentWidth, 44, [252, 252, 255]);
-  drawSectionTitle(marginX + 6, 234, 'Amount');
-  doc.line(marginX + 6, 241, pageWidth - marginX - 6, 241);
-  drawInfoRow(marginX + 8, 249, 'Amount', amountLabel, accent);
-  drawInfoRow(marginX + 8, 257, 'Fee', feeLabel);
-  doc.setDrawColor(border[0], border[1], border[2]);
-  doc.line(marginX + 6, 261.5, pageWidth - marginX - 6, 261.5);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(11);
-  doc.setTextColor(text[0], text[1], text[2]);
-  doc.text('Total', marginX + 8, 270);
-  doc.setTextColor(accent[0], accent[1], accent[2]);
-  doc.setFontSize(13);
-  doc.text(amountLabel, pageWidth - marginX - 8, 270, { align: 'right' });
+  // ── Transaction Details card ────────────────────────────────────────────────
+  let y = heroY + 44;
+  card(mx, y, cw, 62);
 
-  // Footer.
-  const footerTop = 278;
-  doc.setDrawColor(border[0], border[1], border[2]);
-  doc.line(marginX, footerTop, pageWidth - marginX, footerTop);
-  doc.setFont('helvetica', 'italic');
-  doc.setFontSize(8.5);
-  doc.setTextColor(muted[0], muted[1], muted[2]);
-  doc.text('This receipt is computer generated and does not require a signature.', pageWidth / 2, footerTop + 8, { align: 'center' });
+  // Section heading
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(9); rgb(ink);
+  doc.text('Transaction Details', mx + 6, y + 9);
+  divider(y + 13);
 
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10);
-  doc.setTextColor(text[0], text[1], text[2]);
-  doc.text('PayFlow', pageWidth / 2, footerTop + 19, { align: 'center' });
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8.5);
-  doc.setTextColor(purple[0], purple[1], purple[2]);
-  doc.text('www.payflow.app', pageWidth / 2, footerTop + 24, { align: 'center' });
+  row(y + 21, 'Transaction ID', transaction.transactionId);
+  divider(y + 25);
+  row(y + 33, 'Reference ID', transaction.referenceId);
+  divider(y + 37);
+  row(y + 45, 'Date & Time', transaction.dateTime);
+  divider(y + 49);
+  row(y + 57, 'Status', transaction.statusLabel, accent);
+
+  // ── Contact Details card ────────────────────────────────────────────────────
+  y += 68;
+  card(mx, y, cw, 50);
+
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(9); rgb(ink);
+  doc.text('Contact Details', mx + 6, y + 9);
+  divider(y + 13);
+
+  row(y + 21, transaction.contactLabel, transaction.name);
+  divider(y + 25);
+  row(y + 33, 'PayFlow ID', transaction.phone, mid);
+  divider(y + 37);
+  row(y + 45, 'Note', transaction.description || '—');
+
+  // ── Amount Breakdown card ──────────────────────────────────────────────────
+  y += 56;
+  card(mx, y, cw, 55);
+
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(9); rgb(ink);
+  doc.text('Amount Breakdown', mx + 6, y + 9);
+  divider(y + 13);
+
+  row(y + 21, 'Amount', amountLabel, accent);
+  divider(y + 25);
+  row(y + 33, 'Platform Fee', 'INR 0.00', mid);
+
+  // Total row — highlighted band
+  fill(purpleSft); stroke(purpleSft); lw(0);
+  doc.roundedRect(mx + 4, y + 37, cw - 8, 11, 2, 2, 'F');
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5); rgb(ink);
+  doc.text('Total', mx + 8, y + 44.5);
+  rgb(accent);
+  doc.text(amountLabel, rEdge - 8, y + 44.5, { align: 'right' });
+
+  // ── Footer ─────────────────────────────────────────────────────────────────
+  const footY = H - 18;
+  stroke(border); lw(0.25); doc.line(mx, footY, rEdge, footY);
+
+  doc.setFont('helvetica', 'italic'); doc.setFontSize(7); rgb(muted);
+  doc.text('This receipt is computer-generated and does not require a signature.', W / 2, footY + 6, { align: 'center' });
+
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); rgb(purple);
+  doc.text('PayFlow · payflow.app', W / 2, footY + 13, { align: 'center' });
 
   return doc.output('blob');
 }
