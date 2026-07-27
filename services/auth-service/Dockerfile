@@ -69,6 +69,11 @@ COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
 COPY start.sh ./start.sh
 RUN chmod +x ./start.sh
 
+# Give the non-root "node" user ownership of the whole workdir so that
+# `npx prisma migrate deploy` can unpack engine binaries into node_modules
+# at container-start time without a permission error.
+RUN chown -R node:node /app
+
 # Drop root: run as the built-in non-root "node" user.
 USER node
 
