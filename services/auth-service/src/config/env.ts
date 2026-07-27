@@ -86,6 +86,11 @@ const envSchema = z.object({
   SMTP_PASS: z.string().optional(),
   EMAIL_FROM: z.string().default('PayFlow <no-reply@payflow.io>'),
 
+  // ── Resend (replaces Nodemailer/SMTP for hosted environments) ─────────────
+  // Render free tier blocks outbound SMTP; Resend uses HTTPS (port 443).
+  // Get a free API key at https://resend.com — 100 emails/day on free plan.
+  RESEND_API_KEY: z.string().optional(),
+
   // ── Frontend URL ──────────────────────────────────────────────────────────
   // Used to construct the password-reset deep-link sent in emails.
   // Must NOT have a trailing slash.
