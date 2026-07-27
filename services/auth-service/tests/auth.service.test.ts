@@ -60,6 +60,8 @@ function makeUser(overrides: Partial<{
   payflowId: string;
   passwordHash: string;
   refreshTokenHash: string | null;
+  passwordResetToken: string | null;
+  passwordResetExpiry: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }> = {}) {
@@ -69,6 +71,8 @@ function makeUser(overrides: Partial<{
     payflowId: 'alice1234@payflow',
     passwordHash: 'hashed-password',
     refreshTokenHash: null,
+    passwordResetToken: null,
+    passwordResetExpiry: null,
     createdAt: new Date('2024-01-01T00:00:00Z'),
     updatedAt: new Date('2024-01-01T00:00:00Z'),
     ...overrides,

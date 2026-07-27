@@ -63,6 +63,7 @@ function makeTxRepo(): jest.Mocked<TransactionRepository> {
 function makeUser(overrides: Partial<{
   id: string; email: string; payflowId: string;
   passwordHash: string; refreshTokenHash: string | null;
+  passwordResetToken: string | null; passwordResetExpiry: Date | null;
   createdAt: Date; updatedAt: Date;
 }> = {}) {
   return {
@@ -71,6 +72,8 @@ function makeUser(overrides: Partial<{
     payflowId: 'alice1234@payflow',
     passwordHash: 'hash',
     refreshTokenHash: null,
+    passwordResetToken: null,
+    passwordResetExpiry: null,
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides,

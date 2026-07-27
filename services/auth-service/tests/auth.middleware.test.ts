@@ -56,6 +56,8 @@ function makeUser() {
     payflowId: 'alice1234@payflow',
     passwordHash: 'hash',
     refreshTokenHash: null,
+    passwordResetToken: null,
+    passwordResetExpiry: null,
     createdAt: new Date(),
     updatedAt: new Date(),
   };

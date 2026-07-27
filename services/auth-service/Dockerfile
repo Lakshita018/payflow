@@ -59,8 +59,15 @@ COPY --from=builder /app/dist ./dist
 # Copy generated Prisma client (runtime artefacts — not regenerated here).
 COPY --from=builder /app/src/generated ./src/generated
 
-# Copy Prisma schema (needed by migrate deploy at container start if used).
+# Copy Prisma schema + migrations (needed by `prisma migrate deploy` at start).
 COPY --from=builder /app/prisma ./prisma
+
+# Copy prisma.config.ts (Prisma 7 reads this for the datasource adapter).
+COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
+
+# Copy the entrypoint script and make it executable.
+COPY start.sh ./start.sh
+RUN chmod +x ./start.sh
 
 # Drop root: run as the built-in non-root "node" user.
 USER node
@@ -68,4 +75,5 @@ USER node
 # Auth service listens on 3001 by default (see config/env.ts).
 EXPOSE 3001
 
-CMD ["node", "dist/server.js"]
+# start.sh: runs `prisma migrate deploy` then `node dist/server.js`
+CMD ["./start.sh"]
