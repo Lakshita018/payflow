@@ -67,29 +67,16 @@ const envSchema = z.object({
   // Do not go below 10. Do not exceed 16 in production without benchmarking.
   BCRYPT_SALT_ROUNDS: z.coerce.number().int().min(10).max(20).default(12),
 
-  // ── Email / SMTP ──────────────────────────────────────────────────────────
+  // ── Brevo transactional email ─────────────────────────────────────────────
   // Used exclusively for transactional emails (password reset).
-  // All four SMTP_* vars are required when email sending is enabled.
-  // Leave blank to disable email sending (useful for local dev without SMTP).
-  //
-  // Gmail SMTP example:
-  //   SMTP_HOST=smtp.gmail.com
-  //   SMTP_PORT=465
-  //   SMTP_USER=you@gmail.com
-  //   SMTP_PASS=your-app-password   (NOT your Google account password)
-  //   EMAIL_FROM="PayFlow <no-reply@payflow.io>"
-  //
-  // To swap providers (SendGrid, Mailgun, etc.) change only these vars.
-  SMTP_HOST: z.string().optional(),
-  SMTP_PORT: z.coerce.number().int().positive().optional(),
-  SMTP_USER: z.string().optional(),
-  SMTP_PASS: z.string().optional(),
+  // Render free tier blocks outbound SMTP (ports 465/587); Brevo's SDK uses
+  // HTTPS (port 443) which is always reachable.
+  // Get a free API key at https://app.brevo.com → SMTP & API → API Keys.
+  // Free plan: 300 emails/day.
+  // When absent the service logs a warning and skips sending — the auth flow
+  // continues and returns its normal generic response.
+  BREVO_API_KEY: z.string().optional(),
   EMAIL_FROM: z.string().default('PayFlow <no-reply@payflow.io>'),
-
-  // ── Resend (replaces Nodemailer/SMTP for hosted environments) ─────────────
-  // Render free tier blocks outbound SMTP; Resend uses HTTPS (port 443).
-  // Get a free API key at https://resend.com — 100 emails/day on free plan.
-  RESEND_API_KEY: z.string().optional(),
 
   // ── Frontend URL ──────────────────────────────────────────────────────────
   // Used to construct the password-reset deep-link sent in emails.
