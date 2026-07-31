@@ -1,13 +1,22 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Sidebar } from './Sidebar';
 import { TopNavigation } from './TopNavigation';
 import { useInitAuth } from '@/hooks';
+import { useNotificationStore } from '@/store';
 
 export function DashboardLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   useInitAuth();
+
+  // Poll unread count every 30 s so the badge stays fresh without a full page fetch.
+  const refreshUnreadCount = useNotificationStore((s) => s.refreshUnreadCount);
+  useEffect(() => {
+    void refreshUnreadCount();
+    const id = setInterval(() => { void refreshUnreadCount(); }, 30_000);
+    return () => clearInterval(id);
+  }, [refreshUnreadCount]);
 
   return (
     <div className="min-h-screen bg-surface-subtle text-text-primary lg:pl-[17rem]">

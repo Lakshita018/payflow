@@ -12,6 +12,8 @@ import { PrismaClient, Prisma } from '../generated/prisma/client';
 import { UserRepository } from '../repositories/user.repository';
 import { WalletRepository } from '../repositories/wallet.repository';
 import { TransactionRepository, TransactionWithDetails } from '../repositories/transaction.repository';
+import { NotificationRepository } from '../repositories/notification.repository';
+import { NotificationType } from './notification.service';
 import { NotFoundError, UnprocessableEntityError, ConflictError, ForbiddenError } from '../utils/errors';
 import { transferSchema } from '../validators/transaction.validator';
 
@@ -73,7 +75,23 @@ export class TransactionService {
     private readonly userRepository: UserRepository,
     private readonly walletRepository: WalletRepository,
     private readonly transactionRepository: TransactionRepository,
+    private readonly notificationRepository?: NotificationRepository,
   ) {}
+
+  // ── Fire-and-forget notification helper ──────────────────────────────────
+  private notify(
+    userId: string,
+    type: NotificationType,
+    title: string,
+    body: string,
+    refId?: string,
+  ): void {
+    if (!this.notificationRepository) return;
+    const input = refId !== undefined
+      ? { userId, type, title, body, refId }
+      : { userId, type, title, body };
+    void this.notificationRepository.create(input);
+  }
 
   // ── Serialise a TransactionWithDetails row ─────────────────────────────────
   private toHistoryItem(tx: TransactionWithDetails): TransactionHistoryItem {
@@ -188,6 +206,25 @@ export class TransactionService {
 
     // 8. Return result — expose sender's DEBIT record id as the primary transactionId
     const receiverDisplayName = receiver.payflowId.split('@')[0] ?? receiver.payflowId;
+    const senderDisplayName = sender.payflowId.split('@')[0] ?? sender.payflowId;
+    const amtStr = amount.toFixed(2);
+
+    // 9. Fire-and-forget notifications for both parties
+    this.notify(
+      sender.id,
+      NotificationType.MONEY_SENT,
+      'Money Sent',
+      `You sent ₹${amtStr} to ${receiverDisplayName}.`,
+      result.debitRecord.id,
+    );
+    this.notify(
+      receiver.id,
+      NotificationType.MONEY_RECEIVED,
+      'Money Received',
+      `You received ₹${amtStr} from ${senderDisplayName}.`,
+      result.debitRecord.id,
+    );
+
     return {
       transactionId: result.debitRecord.id,
       // eslint-disable-next-line @typescript-eslint/no-unsafe-call

@@ -14,6 +14,7 @@ import { authRouter } from './routes/auth.routes';
 import { walletRouter } from './routes/wallet.routes';
 import { transactionRouter } from './routes/transaction.routes';
 import { userRouter } from './routes/user.routes';
+import { notificationRouter } from './routes/notification.routes';
 import { notFoundMiddleware, errorMiddleware } from './middlewares/error.middleware';
 
 // ---------------------------------------------------------------------------
@@ -128,6 +129,7 @@ export function createApp(): Application {
   app.use('/api/v1/wallets', walletRouter);
   app.use('/api/v1/transactions', transactionRouter);
   app.use('/api/v1/users', userRouter);
+  app.use('/api/v1/notifications', notificationRouter);
 
   // ── Error handling (must be last) ─────────────────────────────────────────
   app.use(notFoundMiddleware);

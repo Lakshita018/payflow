@@ -24,6 +24,7 @@ model User {
   receivedTransactions Transaction[]      @relation("ReceivedTransactions")
   sentTransactions     Transaction[]      @relation("SentTransactions")
   wallet               Wallet?
+  notifications        Notification[]
 
   @@map("users")
 }
@@ -68,4 +69,22 @@ model FavouriteContact {
 
   @@unique([userId, contactUserId])
   @@map("favourite_contacts")
+}
+
+/// MONEY_RECEIVED | MONEY_SENT | WALLET_TOPPED_UP | PASSWORD_CHANGED | PROFILE_UPDATED
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  /// MONEY_RECEIVED | MONEY_SENT | WALLET_TOPPED_UP | PASSWORD_CHANGED | PROFILE_UPDATED
+  type      String
+  title     String
+  body      String
+  isRead    Boolean  @default(false)
+  /// Optional reference to a related transaction id
+  refId     String?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("notifications")
 }

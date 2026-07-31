@@ -107,6 +107,30 @@ export interface RelationshipResult {
   recentTransactions: RelationshipTransaction[];
 }
 
+// ── Notifications ─────────────────────────────────────────────────────────────
+export type NotificationType =
+  | 'MONEY_RECEIVED'
+  | 'MONEY_SENT'
+  | 'WALLET_TOPPED_UP'
+  | 'PASSWORD_CHANGED'
+  | 'PROFILE_UPDATED';
+
+export interface NotificationItem {
+  id: string;
+  type: NotificationType;
+  title: string;
+  body: string;
+  isRead: boolean;
+  refId: string | null;
+  createdAt: string;
+}
+
+export interface NotificationListResult {
+  notifications: NotificationItem[];
+  unreadCount: number;
+  nextCursor: string | null;
+}
+
 // ── API error envelope ───────────────────────────────────────────────────────
 export interface ApiError {
   error: string;

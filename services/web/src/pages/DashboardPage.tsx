@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
-import { motion } from 'framer-motion';
+import { animate, motion, useMotionValue, useTransform } from 'framer-motion';
+import { useEffect, useRef } from 'react';
 import Card from '@/components/ui/Card';
 import { FavouriteContactsCard } from '@/features/dashboard/FavouriteContactsCard';
 import { QuickActionsCard } from '@/features/dashboard/QuickActionsCard';
@@ -24,19 +25,67 @@ interface StatTileProps {
   value: string;
   iconBg: string;
   icon: React.ReactNode;
+  index?: number;
 }
 
-function StatTile({ label, value, iconBg, icon }: StatTileProps) {
+// Animates a numeric value (e.g. "11.0K", "98.6%", "4") from 0 to target
+function AnimatedValue({ value }: { value: string }) {
+  const match = value.match(/^([^\d]*)(\d[\d.,]*)([^\d]*)$/);
+  const motionVal = useMotionValue(0);
+  const ref = useRef<HTMLParagraphElement>(null);
+
+  useEffect(() => {
+    if (!match) return;
+    const raw = parseFloat(match[2].replace(/,/g, ''));
+    if (isNaN(raw)) return;
+    const ctrl = animate(motionVal, raw, { duration: 1.1, ease: [0.16, 1, 0.3, 1] });
+    return ctrl.stop;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+
+  const decimals = match ? (match[2].includes('.') ? match[2].split('.')[1].length : 0) : 0;
+  const display = useTransform(motionVal, (v) =>
+    match ? `${match[1]}${v.toFixed(decimals)}${match[3]}` : value
+  );
+
+  if (!match) {
+    return (
+      <p ref={ref} className="mt-0.5 text-xl font-semibold tabular-nums text-text-primary leading-none">
+        {value}
+      </p>
+    );
+  }
   return (
-    <Card variant="elevated" className="flex items-center gap-4 p-4 sm:p-5">
-      <span className={['flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl', iconBg].join(' ')}>
-        {icon}
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="text-xs font-medium text-text-muted">{label}</p>
-        <p className="mt-0.5 text-xl font-semibold tabular-nums text-text-primary leading-none">{value}</p>
-      </div>
-    </Card>
+    <motion.p ref={ref} className="mt-0.5 text-xl font-semibold tabular-nums text-text-primary leading-none">
+      {display}
+    </motion.p>
+  );
+}
+
+function StatTile({ label, value, iconBg, icon, index = 0 }: StatTileProps) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.38, delay: 0.1 + index * 0.08, ease: [0.16, 1, 0.3, 1] }}
+      whileHover={{ scale: 1.035, transition: { duration: 0.18 } }}
+      whileTap={{ scale: 0.97 }}
+    >
+      <Card variant="elevated" className="flex items-center gap-4 p-4 sm:p-5 cursor-default">
+        <motion.span
+          className={['flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl', iconBg].join(' ')}
+          initial={{ scale: 0.55, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ duration: 0.42, delay: 0.18 + index * 0.08, ease: [0.34, 1.56, 0.64, 1] }}
+        >
+          {icon}
+        </motion.span>
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-medium text-text-muted">{label}</p>
+          <AnimatedValue value={value} />
+        </div>
+      </Card>
+    </motion.div>
   );
 }
 
@@ -153,8 +202,8 @@ export function DashboardPage() {
 
         {/* Stat tiles — stacked 2×2 in the narrower column */}
         <div className="grid grid-cols-2 gap-4 xl:col-span-2">
-          {statTiles.map((tile) => (
-            <StatTile key={tile.label} {...tile} />
+          {statTiles.map((tile, i) => (
+            <StatTile key={tile.label} {...tile} index={i} />
           ))}
         </div>
       </motion.div>

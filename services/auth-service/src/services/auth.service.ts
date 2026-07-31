@@ -18,6 +18,8 @@ import crypto from 'crypto';
 import bcrypt from 'bcrypt';
 import { UserRepository } from '../repositories/user.repository';
 import { WalletRepository } from '../repositories/wallet.repository';
+import { NotificationRepository } from '../repositories/notification.repository';
+import { NotificationType } from './notification.service';
 import { ConflictError, InternalServerError, UnauthorizedError, NotFoundError, BadRequestError } from '../utils/errors';
 import { registerSchema, loginSchema, forgotPasswordSchema, resetPasswordSchema } from '../validators/auth.validator';
 import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from '../utils/jwt';
@@ -91,6 +93,7 @@ export class AuthService {
   constructor(
     private readonly userRepository: UserRepository,
     private readonly walletRepository?: WalletRepository,
+    private readonly notificationRepository?: NotificationRepository,
   ) {}
 
   // ── Register ──────────────────────────────────────────────────────────────
@@ -319,6 +322,16 @@ export class AuthService {
     //    Performed AFTER the password update so a crash between the two steps
     //    does not leave the user with a new password but a still-valid token.
     await this.userRepository.clearPasswordResetToken(user.id);
+
+    // Fire-and-forget password-changed notification
+    if (this.notificationRepository) {
+      void this.notificationRepository.create({
+        userId: user.id,
+        type:   NotificationType.PASSWORD_CHANGED,
+        title:  'Password Changed',
+        body:   'Your PayFlow password was changed successfully. If this wasn\'t you, contact support immediately.',
+      });
+    }
 
     return { message: 'Your password has been reset successfully. Please log in with your new password.' };
   }

@@ -10,6 +10,8 @@
 import { Prisma } from '../generated/prisma/client';
 import { WalletRepository } from '../repositories/wallet.repository';
 import { TransactionRepository } from '../repositories/transaction.repository';
+import { NotificationRepository } from '../repositories/notification.repository';
+import { NotificationType } from './notification.service';
 import { ConflictError, NotFoundError, UnprocessableEntityError } from '../utils/errors';
 import { creditSchema, debitSchema } from '../validators/wallet.validator';
 
@@ -32,6 +34,7 @@ export class WalletService {
   constructor(
     private readonly walletRepository: WalletRepository,
     private readonly transactionRepository?: TransactionRepository,
+    private readonly notificationRepository?: NotificationRepository,
   ) {}
 
   // ── Serialise ─────────────────────────────────────────────────────────────
@@ -99,6 +102,16 @@ export class WalletService {
         type: 'ADD_MONEY',
         direction: 'CREDIT',
         note: 'Added to wallet',
+      });
+    }
+
+    // Fire-and-forget wallet top-up notification
+    if (this.notificationRepository) {
+      void this.notificationRepository.create({
+        userId,
+        type:  NotificationType.WALLET_TOPPED_UP,
+        title: 'Wallet Topped Up',
+        body:  `₹${validated.toFixed(2)} has been added to your PayFlow wallet.`,
       });
     }
 

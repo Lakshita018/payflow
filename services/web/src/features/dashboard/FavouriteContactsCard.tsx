@@ -79,7 +79,7 @@ export function FavouriteContactsCard() {
           <motion.button
             type="button"
             variants={itemVariants}
-            onClick={() => navigate(ROUTES.SEND_MONEY)}
+            onClick={() => navigate(ROUTES.FAVOURITES)}
             className="group flex shrink-0 flex-col items-center gap-2"
             title="Add new contact"
           >

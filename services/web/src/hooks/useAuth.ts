@@ -21,7 +21,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authService } from '@/services';
-import { useAuthStore } from '@/store';
+import { useAuthStore, useNotificationStore } from '@/store';
 import { ROUTES } from '@/routes/paths';
 import type { User } from '@/types';
 
@@ -76,6 +76,7 @@ export function useRegisterMutation() {
 
 export function useLogout() {
   const { logout, user } = useAuthStore();
+  const resetNotifications = useNotificationStore((s) => s.reset);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -92,6 +93,9 @@ export function useLogout() {
 
     // Clear all cached query data so the next user sees a clean state.
     queryClient.clear();
+
+    // Reset notification store so stale data never leaks to the next session.
+    resetNotifications();
 
     // Always clear local state regardless of the server response.
     logout();

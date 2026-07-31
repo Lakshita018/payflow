@@ -14,14 +14,16 @@ import { Router } from 'express';
 import { prisma } from '../config/prisma';
 import { UserRepository } from '../repositories/user.repository';
 import { WalletRepository } from '../repositories/wallet.repository';
+import { NotificationRepository } from '../repositories/notification.repository';
 import { AuthService } from '../services/auth.service';
 import { AuthController } from '../controllers/auth.controller';
 import { createAuthMiddleware } from '../middlewares/auth.middleware';
 
 // ── Dependency composition ─────────────────────────────────────────────────
-const userRepository   = new UserRepository(prisma);
-const walletRepository = new WalletRepository(prisma);
-const authService      = new AuthService(userRepository, walletRepository);
+const userRepository         = new UserRepository(prisma);
+const walletRepository       = new WalletRepository(prisma);
+const notificationRepository = new NotificationRepository(prisma);
+const authService            = new AuthService(userRepository, walletRepository, notificationRepository);
 const authController   = new AuthController(authService);
 
 const auth = createAuthMiddleware(userRepository);

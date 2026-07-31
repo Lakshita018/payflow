@@ -9,18 +9,21 @@ import { prisma } from '../config/prisma';
 import { UserRepository } from '../repositories/user.repository';
 import { WalletRepository } from '../repositories/wallet.repository';
 import { TransactionRepository } from '../repositories/transaction.repository';
+import { NotificationRepository } from '../repositories/notification.repository';
 import { TransactionService } from '../services/transaction.service';
 import { TransactionController } from '../controllers/transaction.controller';
 import { createAuthMiddleware } from '../middlewares/auth.middleware';
 
-const userRepository        = new UserRepository(prisma);
-const walletRepository      = new WalletRepository(prisma);
-const transactionRepository = new TransactionRepository(prisma);
-const transactionService    = new TransactionService(
+const userRepository         = new UserRepository(prisma);
+const walletRepository       = new WalletRepository(prisma);
+const transactionRepository  = new TransactionRepository(prisma);
+const notificationRepository = new NotificationRepository(prisma);
+const transactionService     = new TransactionService(
   prisma,
   userRepository,
   walletRepository,
   transactionRepository,
+  notificationRepository,
 );
 const transactionController = new TransactionController(transactionService);
 
