@@ -23,11 +23,9 @@ const REQUEST_TITLE_ROUTES: Record<string, string> = {
   'Payment Request':   ROUTES.INCOMING_REQUESTS,
   // Requester sees outgoing requests
   'Request Sent':      ROUTES.OUTGOING_REQUESTS,
-  'Payment Received':  ROUTES.OUTGOING_REQUESTS,
   'Request Declined':  ROUTES.OUTGOING_REQUESTS,
   'Request Cancelled': ROUTES.OUTGOING_REQUESTS,
-  // Payer confirmation after approving — has a real transaction refId, keep as transaction detail
-  // 'Payment Sent' is intentionally NOT listed here so it routes to /transactions/:id
+  // 'Payment Received' and 'Payment Sent' both carry a real transaction refId → /transactions/:id
 };
 
 // ── Relative time helper ──────────────────────────────────────────────────────

@@ -1,6 +1,7 @@
 // ---------------------------------------------------------------------------
 // Payment-request routes — composition root for the Request Money feature.
 //   prisma → PaymentRequestRepository + UserRepository + WalletRepository
+//          + notificationService (shared singleton — owns SSEService)
 //          → PaymentRequestService → PaymentRequestController
 // Mounted at /api/v1/payment-requests in app.ts.
 // ---------------------------------------------------------------------------
@@ -8,22 +9,21 @@ import { Router } from 'express';
 import { prisma } from '../config/prisma';
 import { UserRepository } from '../repositories/user.repository';
 import { WalletRepository } from '../repositories/wallet.repository';
-import { NotificationRepository } from '../repositories/notification.repository';
 import { PaymentRequestRepository } from '../repositories/payment-request.repository';
 import { PaymentRequestService } from '../services/payment-request.service';
+import { notificationService } from '../services/shared';
 import { PaymentRequestController } from '../controllers/payment-request.controller';
 import { createAuthMiddleware } from '../middlewares/auth.middleware';
 
-const userRepository            = new UserRepository(prisma);
-const walletRepository          = new WalletRepository(prisma);
-const notificationRepository    = new NotificationRepository(prisma);
-const paymentRequestRepository  = new PaymentRequestRepository(prisma);
-const paymentRequestService     = new PaymentRequestService(
+const userRepository           = new UserRepository(prisma);
+const walletRepository         = new WalletRepository(prisma);
+const paymentRequestRepository = new PaymentRequestRepository(prisma);
+const paymentRequestService    = new PaymentRequestService(
   prisma,
   paymentRequestRepository,
   userRepository,
   walletRepository,
-  notificationRepository,
+  notificationService,
 );
 const paymentRequestController  = new PaymentRequestController(paymentRequestService);
 

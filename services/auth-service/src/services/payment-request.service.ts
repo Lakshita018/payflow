@@ -12,8 +12,7 @@ import { PrismaClient, Prisma } from '../generated/prisma/client';
 import { PaymentRequestRepository, PaymentRequestWithDetails } from '../repositories/payment-request.repository';
 import { UserRepository } from '../repositories/user.repository';
 import { WalletRepository } from '../repositories/wallet.repository';
-import { NotificationRepository } from '../repositories/notification.repository';
-import { NotificationType } from './notification.service';
+import { NotificationService, NotificationType } from './notification.service';
 import {
   NotFoundError,
   ForbiddenError,
@@ -66,7 +65,7 @@ export class PaymentRequestService {
     private readonly paymentRequestRepository: PaymentRequestRepository,
     private readonly userRepository: UserRepository,
     private readonly walletRepository: WalletRepository,
-    private readonly notificationRepository?: NotificationRepository,
+    private readonly notificationService?: NotificationService,
   ) {}
 
   // ── Internal helper ───────────────────────────────────────────────────────
@@ -77,11 +76,11 @@ export class PaymentRequestService {
     body: string,
     refId?: string,
   ): void {
-    if (!this.notificationRepository) return;
+    if (!this.notificationService) return;
     const input = refId !== undefined
       ? { userId, type, title, body, refId }
       : { userId, type, title, body };
-    void this.notificationRepository.create(input);
+    void this.notificationService.create(input);
   }
 
   private toItem(pr: PaymentRequestWithDetails): PaymentRequestItem {
