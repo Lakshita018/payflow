@@ -65,6 +65,9 @@ COPY --from=builder /app/prisma ./prisma
 # Copy prisma.config.ts (Prisma 7 reads this for the datasource adapter).
 COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
 
+# Copy the custom migration runner used by start.sh on Render/Neon.
+COPY --from=builder /app/scripts ./scripts
+
 # Copy the entrypoint script and make it executable.
 COPY start.sh ./start.sh
 RUN chmod +x ./start.sh
@@ -80,5 +83,5 @@ USER node
 # Auth service listens on 3001 by default (see config/env.ts).
 EXPOSE 3001
 
-# start.sh: runs `prisma migrate deploy` then `node dist/server.js`
+# start.sh: runs the custom migration runner, then `node dist/server.js`
 CMD ["./start.sh"]
