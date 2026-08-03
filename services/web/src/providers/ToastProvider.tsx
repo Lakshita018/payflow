@@ -10,6 +10,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useMemo,
   useRef,
   useState,
   type ReactNode,
@@ -142,12 +143,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     timerRef.current[id] = setTimeout(() => dismiss(id), duration);
   }, [dismiss]);
 
-  const toast = {
+  const toast = useMemo(() => ({
     success: (msg: string, dur?: number) => addToast(msg, 'success', dur),
     error:   (msg: string, dur?: number) => addToast(msg, 'error',   dur ?? 5000),
     warning: (msg: string, dur?: number) => addToast(msg, 'warning', dur),
     info:    (msg: string, dur?: number) => addToast(msg, 'info',    dur),
-  };
+  }), [addToast]);
 
   return (
     <ToastContext.Provider value={{ toast }}>

@@ -163,6 +163,7 @@ export function NotificationDropdown() {
     fetchMore,
     markRead,
     markAllRead,
+    refreshUnreadCount,
   } = useNotificationStore();
   // user is null on first render — must not default to `true` before the profile loads.
   const notifUser = useAuthStore((s) => s.user);
@@ -171,6 +172,14 @@ export function NotificationDropdown() {
   const effectiveUnreadCount = pushEnabled ? unreadCount : 0;
 
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Seed the badge on mount so it shows before the dropdown is ever opened.
+  useEffect(() => {
+    if (pushEnabled) {
+      void refreshUnreadCount();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pushEnabled]);
 
   // Fetch when opening — only when push notifications are enabled
   useEffect(() => {

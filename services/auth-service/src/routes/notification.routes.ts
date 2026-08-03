@@ -1,24 +1,29 @@
 // ---------------------------------------------------------------------------
 // Notification routes — composition root for the notification feature.
-//   prisma → NotificationRepository → NotificationService → NotificationController
+//   shared.ts → notificationService + sseService (singletons)
+//             → NotificationController
 // Mounted at /api/v1/notifications in app.ts.
 // ---------------------------------------------------------------------------
 import { Router } from 'express';
 import { prisma } from '../config/prisma';
 import { UserRepository } from '../repositories/user.repository';
-import { NotificationRepository } from '../repositories/notification.repository';
-import { NotificationService } from '../services/notification.service';
+import { sseService, notificationService } from '../services/shared';
 import { NotificationController } from '../controllers/notification.controller';
 import { createAuthMiddleware } from '../middlewares/auth.middleware';
 
 const userRepository         = new UserRepository(prisma);
-const notificationRepository = new NotificationRepository(prisma);
-const notificationService    = new NotificationService(notificationRepository);
-const notificationController = new NotificationController(notificationService);
+const notificationController = new NotificationController(notificationService, sseService);
 
 const auth = createAuthMiddleware(userRepository);
 
 export const notificationRouter = Router();
+
+// GET    /api/v1/notifications/stream
+// Server-Sent Events endpoint for real-time notifications.
+// Must be before other routes to avoid conflicts.
+notificationRouter.get('/stream', (req, res, next) => { void auth(req, res, next); }, (req, res, next) => {
+  void notificationController.stream(req, res, next);
+});
 
 // GET    /api/v1/notifications/unread-count
 // Static path must be registered before the parameterised :id route.

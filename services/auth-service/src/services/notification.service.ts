@@ -16,6 +16,7 @@
 // • No Express types, no req/res.
 // ---------------------------------------------------------------------------
 import { NotificationRepository } from '../repositories/notification.repository';
+import { SSEService } from './sse.service';
 
 // ---------------------------------------------------------------------------
 // Notification types enum
@@ -57,6 +58,7 @@ const PAGE_SIZE = 20;
 export class NotificationService {
   constructor(
     private readonly notificationRepository: NotificationRepository,
+    private readonly sseService?: SSEService,
   ) {}
 
   // ── Internal helper: create a notification (used by other services) ───────
@@ -67,7 +69,23 @@ export class NotificationService {
     body: string;
     refId?: string;
   }): Promise<void> {
-    await this.notificationRepository.create(input);
+    // Create the notification in the database
+    const notification = await this.notificationRepository.create(input);
+    console.log('[NOTIFICATION CREATED]', notification.id, notification.userId);
+
+    // Broadcast to SSE listeners (if service available)
+    if (this.sseService) {
+      console.log('[BROADCASTING]', notification.id);
+      await this.sseService.broadcast(input.userId, {
+        id:        notification.id,
+        type:      notification.type,
+        title:     notification.title,
+        body:      notification.body,
+        isRead:    notification.isRead,
+        refId:     notification.refId,
+        createdAt: notification.createdAt.toISOString(),
+      });
+    }
   }
 
   // ── List notifications (paginated) ────────────────────────────────────────

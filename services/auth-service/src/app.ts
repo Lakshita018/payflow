@@ -61,7 +61,17 @@ export function createApp(): Application {
   );
 
   // ── Compression — gzip responses ────────────────────────────────────────
-  app.use(compression());
+  // Skip compression for SSE streams: the compressor buffers output waiting
+  // to finalise the gzip stream, which prevents event-stream data from ever
+  // being flushed to the client and causes the connection to 500.
+  app.use(
+    compression({
+      filter: (req, res) => {
+        if (res.getHeader('Content-Type') === 'text/event-stream') return false;
+        return compression.filter(req, res);
+      },
+    }),
+  );
 
   // ── Core middleware ──────────────────────────────────────────────────────
 

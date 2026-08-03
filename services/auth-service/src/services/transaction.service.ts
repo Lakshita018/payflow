@@ -12,8 +12,7 @@ import { PrismaClient, Prisma } from '../generated/prisma/client';
 import { UserRepository } from '../repositories/user.repository';
 import { WalletRepository } from '../repositories/wallet.repository';
 import { TransactionRepository, TransactionWithDetails } from '../repositories/transaction.repository';
-import { NotificationRepository } from '../repositories/notification.repository';
-import { NotificationType } from './notification.service';
+import { NotificationService, NotificationType } from './notification.service';
 import { IdempotencyService } from './idempotency.service';
 import { NotFoundError, UnprocessableEntityError, ConflictError, ForbiddenError } from '../utils/errors';
 import { transferSchema } from '../validators/transaction.validator';
@@ -78,7 +77,7 @@ export class TransactionService {
     private readonly userRepository: UserRepository,
     private readonly walletRepository: WalletRepository,
     private readonly transactionRepository: TransactionRepository,
-    private readonly notificationRepository?: NotificationRepository,
+    private readonly notificationService?: NotificationService,
     private readonly idempotencyService?: IdempotencyService,
   ) {}
 
@@ -90,11 +89,11 @@ export class TransactionService {
     body: string,
     refId?: string,
   ): void {
-    if (!this.notificationRepository) return;
+    if (!this.notificationService) return;
     const input = refId !== undefined
       ? { userId, type, title, body, refId }
       : { userId, type, title, body };
-    void this.notificationRepository.create(input);
+    void this.notificationService.create(input);
   }
 
   // ── Serialise a TransactionWithDetails row ─────────────────────────────────

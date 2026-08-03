@@ -1,27 +1,17 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Sidebar } from './Sidebar';
 import { TopNavigation } from './TopNavigation';
 import { useInitAuth } from '@/hooks';
-import { useNotificationStore, useAuthStore } from '@/store';
 
 export function DashboardLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   useInitAuth();
 
-  // Poll unread count every 30 s — only once the user is loaded AND push notifications are enabled.
-  // user is null on first render (tokens in localStorage, /me not yet fetched), so we
-  // must wait for a non-null user before checking the preference to avoid defaulting to `true`.
-  const refreshUnreadCount = useNotificationStore((s) => s.refreshUnreadCount);
-  const user = useAuthStore((s) => s.user);
-  const pushEnabled = user !== null && (user.pushNotifications ?? true);
-  useEffect(() => {
-    if (!pushEnabled) return;
-    void refreshUnreadCount();
-    const id = setInterval(() => { void refreshUnreadCount(); }, 30_000);
-    return () => clearInterval(id);
-  }, [refreshUnreadCount, pushEnabled]);
+  // NOTE: Real-time notifications are now delivered via SSE in useSSENotifications hook.
+  // The hook handles all notification updates immediately when they arrive.
+  // Legacy polling has been removed; SSE provides instant delivery.
 
   return (
     <div className="min-h-screen bg-surface-subtle text-text-primary lg:pl-[17rem]">

@@ -31,6 +31,8 @@ interface NotificationState {
   markRead: (id: string) => Promise<void>;
   /** Mark all notifications as read. */
   markAllRead: () => Promise<void>;
+  /** Add a real-time notification (SSE). Prevents duplicates by ID. */
+  addNotification: (notification: NotificationItem) => void;
   /** Reset store on logout. */
   reset: () => void;
 }
@@ -118,6 +120,21 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       // revert on failure
       await get().fetchNotifications();
     }
+  },
+
+  addNotification: (notification) => {
+    set((state) => {
+      console.log('[STORE BEFORE]', state.notifications.length);
+      console.log('[ADDING]', notification.id);
+      // Deduplicate by ID
+      if (state.notifications.some((n) => n.id === notification.id)) return state;
+      const next = {
+        notifications: [notification, ...state.notifications],
+        unreadCount: state.unreadCount + 1,
+      };
+      console.log('[STORE AFTER]', next.notifications.length);
+      return next;
+    });
   },
 
   reset: () => set({ notifications: [], unreadCount: 0, nextCursor: null, isOpen: false, isFetching: false }),
