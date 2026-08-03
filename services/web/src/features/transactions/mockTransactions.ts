@@ -12,6 +12,8 @@ export interface TransactionRecord extends TransactionItem {
   summaryDate: string;
   summaryTime: string;
   dateTime: string;
+  /** ISO 8601 date-time string used for reliable date-based filtering */
+  createdAt: string;
 }
 
 const receivedAmount = '₹1,250.00';
@@ -39,6 +41,7 @@ export const transactionRecords: TransactionRecord[] = [
     summaryDate: 'Today',
     summaryTime: '10:30 AM',
     dateTime: 'Today, 10:30 AM · 18 Jul 2026',
+    createdAt: new Date(new Date().setHours(10, 30, 0, 0)).toISOString(),
   },
   {
     id: 'txn-784511',
@@ -61,6 +64,7 @@ export const transactionRecords: TransactionRecord[] = [
     summaryDate: 'Yesterday',
     summaryTime: '8:15 PM',
     dateTime: 'Yesterday, 8:15 PM · 17 Jul 2026',
+    createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
   },
   {
     id: 'txn-784510',
@@ -83,6 +87,7 @@ export const transactionRecords: TransactionRecord[] = [
     summaryDate: 'May 16, 2024',
     summaryTime: '6:45 PM',
     dateTime: 'May 16, 2024 · 6:45 PM',
+    createdAt: '2024-05-16T13:15:00.000Z',
   },
   {
     id: 'txn-784509',
@@ -105,6 +110,7 @@ export const transactionRecords: TransactionRecord[] = [
     summaryDate: 'May 12, 2024',
     summaryTime: '9:20 AM',
     dateTime: 'May 12, 2024 · 9:20 AM',
+    createdAt: '2024-05-12T03:50:00.000Z',
   },
   {
     id: 'txn-784508',
@@ -127,6 +133,7 @@ export const transactionRecords: TransactionRecord[] = [
     summaryDate: 'May 10, 2024',
     summaryTime: '11:10 PM',
     dateTime: 'May 10, 2024 · 11:10 PM',
+    createdAt: '2024-05-10T17:40:00.000Z',
   },
   {
     id: 'txn-784507',
@@ -149,6 +156,7 @@ export const transactionRecords: TransactionRecord[] = [
     summaryDate: 'May 9, 2024',
     summaryTime: '1:05 PM',
     dateTime: 'May 9, 2024 · 1:05 PM',
+    createdAt: '2024-05-09T07:35:00.000Z',
   },
   {
     id: 'txn-784506',
@@ -171,6 +179,7 @@ export const transactionRecords: TransactionRecord[] = [
     summaryDate: 'May 8, 2024',
     summaryTime: '7:45 PM',
     dateTime: 'May 8, 2024 · 7:45 PM',
+    createdAt: '2024-05-08T14:15:00.000Z',
   },
 ];
 

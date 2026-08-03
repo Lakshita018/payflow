@@ -7,6 +7,12 @@ export interface User {
   id: string;
   email: string;
   payflowId: string;
+  displayName: string | null;
+  phone: string | null;
+  avatarUrl: string | null;
+  emailNotifications: boolean;
+  pushNotifications: boolean;
+  themePreference: string;
   createdAt: string;
 }
 
@@ -68,6 +74,7 @@ export interface DashboardData {
 export interface PublicProfile {
   displayName: string;
   payflowId: string;
+  email: string;
   avatar: null;
 }
 

@@ -20,11 +20,12 @@ import { NotFoundError } from '../utils/errors';
 import { searchQuerySchema } from '../validators/user.validator';
 
 // ---------------------------------------------------------------------------
-// Utility — derives a human-readable display name from a payflowId.
-// "lakshita4821@payflow" → "lakshita4821"
-// Falls back to the full payflowId if no "@" is present.
+// Utility — resolves the best available display name for a user.
+// Prefers the stored displayName field; falls back to the payflowId prefix.
+// "lakshita4821@payflow" → "lakshita4821"  (when no displayName set)
 // ---------------------------------------------------------------------------
-function displayNameFrom(payflowId: string): string {
+function displayNameFrom(payflowId: string, displayName?: string | null): string {
+  if (displayName) return displayName;
   return payflowId.split('@')[0] ?? payflowId;
 }
 
@@ -44,6 +45,7 @@ export interface RecipientProfile {
 export interface PublicProfile {
   displayName: string;
   payflowId: string;
+  email: string;
   avatar: null;
 }
 
@@ -107,7 +109,7 @@ export class UserService {
     // PayFlow ID is valid, so walletExists mirrors user found.
     const walletExists = true;
     return {
-      displayName: displayNameFrom(user.payflowId),
+      displayName: displayNameFrom(user.payflowId, (user as any).displayName),
       payflowId: user.payflowId,
       avatar: null,
       walletExists,
@@ -115,14 +117,15 @@ export class UserService {
   }
 
   // ── User search ────────────────────────────────────────────────────────────
-  // Partial, case-insensitive search on payflowId.
+  // Partial, case-insensitive search on payflowId, email, and displayName.
   // Excludes the authenticated user from results.
   async search(rawQuery: string, requestingUserId: string): Promise<PublicProfile[]> {
     const { q } = searchQuerySchema.parse({ q: rawQuery });
     const users = await this.userRepository.findManyPublic(q, requestingUserId, 10);
     return users.map((u) => ({
-      displayName: displayNameFrom(u.payflowId),
+      displayName: displayNameFrom(u.payflowId, u.displayName),
       payflowId: u.payflowId,
+      email: u.email,
       avatar: null,
     }));
   }
@@ -143,7 +146,7 @@ export class UserService {
         const profile = profileMap.get(c.contactId);
         if (profile === undefined) return null;
         return {
-          displayName: displayNameFrom(profile.payflowId),
+          displayName: displayNameFrom(profile.payflowId, profile.displayName),
           payflowId: profile.payflowId,
           avatar: null,
           lastInteractionAt: c.lastInteractionAt,
@@ -200,8 +203,9 @@ export class UserService {
         const p = profileMap.get(id);
         if (p === undefined) return null;
         return {
-          displayName: displayNameFrom(p.payflowId),
+          displayName: displayNameFrom(p.payflowId, p.displayName),
           payflowId: p.payflowId,
+          email: p.email,
           avatar: null,
         };
       })
@@ -217,7 +221,7 @@ export class UserService {
     }
     const isFav = await this.favouriteRepository.isFavourite(requestingUserId, user.id);
     return {
-      displayName: displayNameFrom(user.payflowId),
+      displayName: displayNameFrom(user.payflowId, (user as any).displayName),
       payflowId: user.payflowId,
       email: user.email,
       avatar: null,

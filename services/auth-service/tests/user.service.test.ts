@@ -64,6 +64,8 @@ function makeUser(overrides: Partial<{
   id: string; email: string; payflowId: string;
   passwordHash: string; refreshTokenHash: string | null;
   passwordResetToken: string | null; passwordResetExpiry: Date | null;
+  displayName: string | null; phone: string | null; avatarUrl: string | null;
+  emailNotifications: boolean; pushNotifications: boolean; themePreference: string;
   createdAt: Date; updatedAt: Date;
 }> = {}) {
   return {
@@ -74,6 +76,12 @@ function makeUser(overrides: Partial<{
     refreshTokenHash: null,
     passwordResetToken: null,
     passwordResetExpiry: null,
+    displayName: null,
+    phone: null,
+    avatarUrl: null,
+    emailNotifications: true,
+    pushNotifications: true,
+    themePreference: 'system',
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides,
@@ -147,8 +155,8 @@ describe('UserService.search()', () => {
   it('returns matching users as PublicProfile[]', async () => {
     const userRepo = makeUserRepo();
     userRepo.findManyPublic.mockResolvedValue([
-      { payflowId: 'alice1234@payflow', email: 'alice@example.com' },
-      { payflowId: 'alan9876@payflow',  email: 'alan@example.com' },
+      { payflowId: 'alice1234@payflow', email: 'alice@example.com', displayName: null },
+      { payflowId: 'alan9876@payflow',  email: 'alan@example.com',  displayName: null },
     ]);
     const service = makeService(userRepo, makeFavRepo(), makeTxRepo());
 
@@ -158,14 +166,24 @@ describe('UserService.search()', () => {
     expect(result[0]?.payflowId).toBe('alice1234@payflow');
   });
 
-  it('derives displayName from payflowId prefix', async () => {
+  it('derives displayName from payflowId prefix when no displayName set', async () => {
     const userRepo = makeUserRepo();
-    userRepo.findManyPublic.mockResolvedValue([{ payflowId: 'harsh5678@payflow', email: 'harsh@example.com' }]);
+    userRepo.findManyPublic.mockResolvedValue([{ payflowId: 'harsh5678@payflow', email: 'harsh@example.com', displayName: null }]);
     const service = makeService(userRepo, makeFavRepo(), makeTxRepo());
 
     const result = await service.search('har', 'user-1');
 
     expect(result[0]?.displayName).toBe('harsh5678');
+  });
+
+  it('uses stored displayName when available', async () => {
+    const userRepo = makeUserRepo();
+    userRepo.findManyPublic.mockResolvedValue([{ payflowId: 'harsh5678@payflow', email: 'harsh@example.com', displayName: 'Harsh Kumar' }]);
+    const service = makeService(userRepo, makeFavRepo(), makeTxRepo());
+
+    const result = await service.search('har', 'user-1');
+
+    expect(result[0]?.displayName).toBe('Harsh Kumar');
   });
 
   it('passes excludeUserId and limit=10 to repository', async () => {
@@ -188,15 +206,15 @@ describe('UserService.search()', () => {
     expect(result).toEqual([]);
   });
 
-  it('never exposes email in search results', async () => {
+  it('never exposes internal id or passwordHash in search results', async () => {
     const userRepo = makeUserRepo();
-    userRepo.findManyPublic.mockResolvedValue([{ payflowId: 'bob5678@payflow', email: 'bob@example.com' }]);
+    userRepo.findManyPublic.mockResolvedValue([{ payflowId: 'bob5678@payflow', email: 'bob@example.com', displayName: null }]);
     const service = makeService(userRepo, makeFavRepo(), makeTxRepo());
 
     const result = await service.search('bob', 'user-1');
 
-    expect(result[0]).not.toHaveProperty('email');
     expect(result[0]).not.toHaveProperty('id');
+    expect(result[0]).not.toHaveProperty('passwordHash');
   });
 
   it('throws ZodError when query is empty string', async () => {
@@ -230,7 +248,7 @@ describe('UserService.getRecentContacts()', () => {
       { contactId: 'user-2', lastInteractionAt: interactionDate, transactionCount: 3 },
     ]);
     userRepo.findPublicByIds.mockResolvedValue([
-      { id: 'user-2', payflowId: 'bob5678@payflow', email: 'bob@example.com' },
+      { id: 'user-2', payflowId: 'bob5678@payflow', email: 'bob@example.com', displayName: null },
     ]);
 
     const service = makeService(userRepo, makeFavRepo(), txRepo);
@@ -264,8 +282,8 @@ describe('UserService.getRecentContacts()', () => {
       { contactId: 'user-b', lastInteractionAt: new Date('2024-06-10'), transactionCount: 2 },
     ]);
     userRepo.findPublicByIds.mockResolvedValue([
-      { id: 'user-a', payflowId: 'anna9001@payflow', email: 'anna@example.com' },
-      { id: 'user-b', payflowId: 'ben4321@payflow',  email: 'ben@example.com'  },
+      { id: 'user-a', payflowId: 'anna9001@payflow', email: 'anna@example.com', displayName: null },
+      { id: 'user-b', payflowId: 'ben4321@payflow',  email: 'ben@example.com',  displayName: null },
     ]);
 
     const service = makeService(userRepo, makeFavRepo(), txRepo);
@@ -366,8 +384,8 @@ describe('UserService.getFavourites()', () => {
     const userRepo = makeUserRepo();
     favRepo.findContactIdsByUser.mockResolvedValue(['user-2', 'user-3']);
     userRepo.findPublicByIds.mockResolvedValue([
-      { id: 'user-2', payflowId: 'bob5678@payflow',   email: 'bob@example.com'   },
-      { id: 'user-3', payflowId: 'carol321@payflow', email: 'carol@example.com' },
+      { id: 'user-2', payflowId: 'bob5678@payflow',   email: 'bob@example.com',   displayName: null },
+      { id: 'user-3', payflowId: 'carol321@payflow', email: 'carol@example.com', displayName: null },
     ]);
     const service = makeService(userRepo, favRepo, makeTxRepo());
 
@@ -379,18 +397,18 @@ describe('UserService.getFavourites()', () => {
     expect(result[1]?.payflowId).toBe('carol321@payflow');
   });
 
-  it('never exposes email or id in favourites list', async () => {
+  it('never exposes internal id or passwordHash in favourites list', async () => {
     const favRepo = makeFavRepo();
     const userRepo = makeUserRepo();
     favRepo.findContactIdsByUser.mockResolvedValue(['user-2']);
     userRepo.findPublicByIds.mockResolvedValue([
-      { id: 'user-2', payflowId: 'bob5678@payflow', email: 'bob@example.com' },
+      { id: 'user-2', payflowId: 'bob5678@payflow', email: 'bob@example.com', displayName: null },
     ]);
     const service = makeService(userRepo, favRepo, makeTxRepo());
 
     const result = await service.getFavourites('user-1');
 
-    expect(result[0]).not.toHaveProperty('email');
     expect(result[0]).not.toHaveProperty('id');
+    expect(result[0]).not.toHaveProperty('passwordHash');
   });
 });

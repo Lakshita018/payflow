@@ -73,7 +73,49 @@ export interface MeResponse {
   id: string;
   email: string;
   payflowId: string;
+  displayName: string | null;
+  phone: string | null;
+  avatarUrl: string | null;
+  emailNotifications: boolean;
+  pushNotifications: boolean;
+  themePreference: string;
   createdAt: string;
+}
+
+// ── Profile Update ────────────────────────────────────────────────────────────
+
+export interface UpdateProfileRequest {
+  displayName?: string | null;
+  phone?: string | null;
+  avatarUrl?: string | null;
+}
+
+export interface UpdateProfileResponse {
+  id: string;
+  displayName: string | null;
+  phone: string | null;
+  avatarUrl: string | null;
+}
+
+// ── Change Password ───────────────────────────────────────────────────────────
+
+export interface ChangePasswordRequest {
+  currentPassword: string;
+  newPassword: string;
+}
+
+// ── Preferences ───────────────────────────────────────────────────────────────
+
+export interface UpdatePreferencesRequest {
+  emailNotifications?: boolean;
+  pushNotifications?: boolean;
+  themePreference?: string;
+}
+
+export interface UpdatePreferencesResponse {
+  emailNotifications: boolean;
+  pushNotifications: boolean;
+  themePreference: string;
 }
 
 /** GET /api/v1/auth/me → { id, email, payflowId, createdAt } */
@@ -118,5 +160,28 @@ export async function forgotPassword(payload: ForgotPasswordRequest): Promise<Fo
  */
 export async function resetPassword(payload: ResetPasswordRequest): Promise<ResetPasswordResponse> {
   const { data } = await apiClient.post<ResetPasswordResponse>('/api/v1/auth/reset-password', payload);
+  return data;
+}
+
+/** PATCH /api/v1/auth/me — update display name, phone, and/or avatar */
+export async function updateProfile(payload: UpdateProfileRequest): Promise<UpdateProfileResponse> {
+  const { data } = await apiClient.patch<UpdateProfileResponse>('/api/v1/auth/me', payload);
+  return data;
+}
+
+/** POST /api/v1/auth/change-password */
+export async function changePassword(payload: ChangePasswordRequest): Promise<{ message: string }> {
+  const { data } = await apiClient.post<{ message: string }>('/api/v1/auth/change-password', payload);
+  return data;
+}
+
+/** POST /api/v1/auth/logout-all — invalidate all sessions */
+export async function logoutAll(): Promise<void> {
+  await apiClient.post('/api/v1/auth/logout-all');
+}
+
+/** PATCH /api/v1/auth/preferences — save notification/theme preferences */
+export async function updatePreferences(payload: UpdatePreferencesRequest): Promise<UpdatePreferencesResponse> {
+  const { data } = await apiClient.patch<UpdatePreferencesResponse>('/api/v1/auth/preferences', payload);
   return data;
 }

@@ -64,9 +64,11 @@ export function createApp(): Application {
 
   // ── Core middleware ──────────────────────────────────────────────────────
 
-  // Parse JSON bodies; reject payloads > 1 MB to limit abuse surface.
-  app.use(express.json({ limit: '1mb' }));
-  app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+  // Parse JSON bodies.  The limit is set to 3 MB to accommodate base64-encoded
+  // avatar images — a 2 MB image becomes ~2.67 MB as a base64 data URI, so 1 MB
+  // was too small and caused Express to reject PATCH /auth/me with a 500.
+  app.use(express.json({ limit: '3mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '3mb' }));
 
   // Structured HTTP request logging via pino-http.
   // Each incoming request gets a unique `reqId` for distributed tracing.

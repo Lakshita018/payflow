@@ -58,6 +58,12 @@ function makeUser() {
     refreshTokenHash: null,
     passwordResetToken: null,
     passwordResetExpiry: null,
+    displayName: null,
+    phone: null,
+    avatarUrl: null,
+    emailNotifications: true,
+    pushNotifications: true,
+    themePreference: 'system',
     createdAt: new Date(),
     updatedAt: new Date(),
   };

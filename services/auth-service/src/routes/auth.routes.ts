@@ -50,6 +50,18 @@ authRouter.post('/logout', (req, res, next) => { void authController.logout(req,
 // GET /api/v1/auth/me  — protected, returns current user's profile
 authRouter.get('/me', (req, res, next) => { void auth(req, res, next); }, (req, res, next) => { void authController.me(req, res, next); });
 
+// PATCH /api/v1/auth/me  — protected, updates editable profile fields
+authRouter.patch('/me', (req, res, next) => { void auth(req, res, next); }, (req, res, next) => { void authController.updateProfile(req, res, next); });
+
+// POST /api/v1/auth/change-password  — protected
+authRouter.post('/change-password', (req, res, next) => { void auth(req, res, next); }, (req, res, next) => { void authController.changePassword(req, res, next); });
+
+// POST /api/v1/auth/logout-all  — protected; invalidates all sessions
+authRouter.post('/logout-all', (req, res, next) => { void auth(req, res, next); }, (req, res, next) => { void authController.logoutAll(req, res, next); });
+
+// PATCH /api/v1/auth/preferences  — protected; saves user preferences
+authRouter.patch('/preferences', (req, res, next) => { void auth(req, res, next); }, (req, res, next) => { void authController.updatePreferences(req, res, next); });
+
 // POST /api/v1/auth/forgot-password  — public; rate-limited in app.ts
 authRouter.post('/forgot-password', (req, res, next) => { void authController.forgotPassword(req, res, next); });
 

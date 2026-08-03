@@ -163,16 +163,18 @@ export function DashboardPage() {
   return (
     <div className="mx-auto w-full max-w-7xl space-y-5">
       {/* ── Row 1: Wallet hero + Quick actions ──────────────────────────── */}
+      {/* Fires at 1100px viewport. Sidebar is 272px (lg:pl-[17rem]), so content  */}
+      {/* width at 1100px = 828px — comfortably holds the 3+2 column layout.      */}
       <motion.div
-        className="grid items-stretch gap-5 xl:grid-cols-5"
+        className="grid items-stretch gap-5 min-[1100px]:grid-cols-5"
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
       >
-        <div className="xl:col-span-3">
+        <div className="min-[1100px]:col-span-3">
           <WalletHeroCard />
         </div>
-        <div className="xl:col-span-2">
+        <div className="min-[1100px]:col-span-2">
           <QuickActionsCard />
         </div>
       </motion.div>
@@ -190,18 +192,18 @@ export function DashboardPage() {
 
       {/* ── Row 3: Favourite contacts + Stat tiles ───────────────────────── */}
       <motion.div
-        className="grid items-stretch gap-5 xl:grid-cols-5"
+        className="grid items-stretch gap-5 min-[1100px]:grid-cols-5"
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.28, delay: 0.12, ease: [0.16, 1, 0.3, 1] }}
       >
         {/* Favourite contacts — wider column */}
-        <div className="xl:col-span-3">
+        <div className="min-[1100px]:col-span-3">
           <FavouriteContactsCard />
         </div>
 
         {/* Stat tiles — stacked 2×2 in the narrower column */}
-        <div className="grid grid-cols-2 gap-4 xl:col-span-2">
+        <div className="grid grid-cols-2 gap-4 min-[1100px]:col-span-2">
           {statTiles.map((tile, i) => (
             <StatTile key={tile.label} {...tile} index={i} />
           ))}

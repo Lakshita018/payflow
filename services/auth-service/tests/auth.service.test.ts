@@ -62,6 +62,12 @@ function makeUser(overrides: Partial<{
   refreshTokenHash: string | null;
   passwordResetToken: string | null;
   passwordResetExpiry: Date | null;
+  displayName: string | null;
+  phone: string | null;
+  avatarUrl: string | null;
+  emailNotifications: boolean;
+  pushNotifications: boolean;
+  themePreference: string;
   createdAt: Date;
   updatedAt: Date;
 }> = {}) {
@@ -73,6 +79,12 @@ function makeUser(overrides: Partial<{
     refreshTokenHash: null,
     passwordResetToken: null,
     passwordResetExpiry: null,
+    displayName: null,
+    phone: null,
+    avatarUrl: null,
+    emailNotifications: true,
+    pushNotifications: true,
+    themePreference: 'system',
     createdAt: new Date('2024-01-01T00:00:00Z'),
     updatedAt: new Date('2024-01-01T00:00:00Z'),
     ...overrides,

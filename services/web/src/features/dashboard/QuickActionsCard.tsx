@@ -7,13 +7,14 @@ import { ROUTES } from '@/routes/paths';
 import { ChevronRightIcon, PlusIcon, SendMoneyIcon } from './icons';
 import { useNavigate } from 'react-router-dom';
 import { walletService, transactionService } from '@/services';
+import { useToast } from '@/providers/ToastProvider';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function fmt(val: string | undefined): string {
-  if (!val) return '—';
+  if (val === undefined || val === null) return '—';
   const n = parseFloat(val);
-  if (isNaN(n) || n === 0) return '—';
+  if (isNaN(n)) return '—';
   return '₹' + n.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 }
 
@@ -22,10 +23,15 @@ function fmt(val: string | undefined): string {
 function AddMoneyModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
   const [rawAmount, setRawAmount] = useState('');
   const [error, setError] = useState('');
+  const { toast } = useToast();
 
   const mutation = useMutation({
     mutationFn: (amount: number) => walletService.credit(amount),
-    onSuccess: () => { onSuccess(); onClose(); },
+    onSuccess: () => {
+      toast.success('Money added to wallet!');
+      onSuccess();
+      onClose();
+    },
     onError: (err: unknown) => {
       const message = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Failed to add money. Please try again.';
       setError(message);
@@ -50,22 +56,26 @@ function AddMoneyModal({ onClose, onSuccess }: { onClose: () => void; onSuccess:
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 backdrop-blur-sm p-4"
+        className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/50 backdrop-blur-sm p-4 sm:items-center"
         onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+        onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}
       >
         <motion.div
           key="modal-panel"
-          initial={{ opacity: 0, scale: 0.95, y: 8 }}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="quick-add-money-title"
+          initial={{ opacity: 0, scale: 0.95, y: 16 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: 8 }}
+          exit={{ opacity: 0, scale: 0.95, y: 16 }}
           transition={{ type: 'spring', stiffness: 380, damping: 28 }}
           className="w-full max-w-md rounded-3xl border border-border bg-surface p-6 shadow-modal"
         >
           <div className="mb-5 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-text-primary">Add Money to Wallet</h2>
+            <h2 id="quick-add-money-title" className="text-lg font-semibold text-text-primary">Add Money to Wallet</h2>
             <button type="button" onClick={onClose}
-              className="flex h-8 w-8 items-center justify-center rounded-xl text-text-muted transition-colors hover:bg-surface-muted hover:text-text-primary"
-              aria-label="Close">
+              className="flex h-8 w-8 items-center justify-center rounded-xl text-text-muted transition-colors hover:bg-surface-muted hover:text-text-primary focus-visible:ring-2 focus-visible:ring-brand-600"
+              aria-label="Close dialog">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4" aria-hidden="true">
                 <path d="M18 6 6 18M6 6l12 12" />
               </svg>
@@ -143,8 +153,8 @@ export function QuickActionsCard() {
   ];
 
   const stats = [
-    { label: 'Sent today', value: fmt(dashboard?.moneySentToday) },
-    { label: 'This month', value: fmt(dashboard?.monthlySpending) },
+    { label: 'Total sent', value: fmt(dashboard?.totalSent) },
+    { label: 'Total received', value: fmt(dashboard?.totalReceived) },
   ];
 
   return (

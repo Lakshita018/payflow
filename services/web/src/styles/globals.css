@@ -70,6 +70,8 @@
   }
 
   /* ── Theme transition on all elements ────────────────────────────────── */
+  /* Deliberately excludes transform/opacity so Framer Motion animations   */
+  /* are not overridden by this blanket rule.                               */
   *, *::before, *::after {
     transition-property: background-color, border-color, color, fill, stroke;
     transition-timing-function: ease;
@@ -79,7 +81,7 @@
   /* ── Smooth focus ring ────────────────────────────────────────────────── */
   *:focus-visible {
     @apply outline-none ring-2 ring-brand-600 ring-offset-2;
-    ring-offset-color: var(--color-surface);
+    --tw-ring-offset-color: var(--color-surface);
   }
 
   /* ── Minimal branded scrollbar ───────────────────────────────────────── */

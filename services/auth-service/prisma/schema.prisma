@@ -17,6 +17,17 @@ model User {
   passwordResetToken      String?
   /// UTC expiry for the reset token — null when no reset is pending
   passwordResetExpiry     DateTime?
+  /// User-chosen display name; defaults to the payflowId prefix when null
+  displayName             String?
+  /// E.164 phone number (optional)
+  phone                   String?
+  /// Public URL or base64 data URI for the user's avatar
+  avatarUrl               String?
+  /// User preferences stored as a JSON blob
+  emailNotifications      Boolean            @default(true)
+  pushNotifications       Boolean            @default(true)
+  /// light | dark | system
+  themePreference         String             @default("system")
   createdAt               DateTime           @default(now())
   updatedAt               DateTime           @updatedAt
   favouritedBy         FavouriteContact[] @relation("FavouritedUsers")

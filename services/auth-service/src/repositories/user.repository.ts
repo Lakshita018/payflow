@@ -32,6 +32,7 @@ import { PrismaClient, User } from '../generated/prisma/client';
 export interface PublicUser {
   payflowId: string;
   email: string;
+  displayName: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -42,6 +43,18 @@ export interface CreateUserInput {
   email: string;
   payflowId: string;
   passwordHash: string;
+}
+
+export interface UpdateProfileInput {
+  displayName?: string | null | undefined;
+  phone?: string | null | undefined;
+  avatarUrl?: string | null | undefined;
+}
+
+export interface UpdatePreferencesInput {
+  emailNotifications?: boolean | undefined;
+  pushNotifications?: boolean | undefined;
+  themePreference?: string | undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -81,11 +94,11 @@ export class UserRepository {
   async findPublicByPayflowId(payflowId: string): Promise<PublicUser | null> {
     return this.db.user.findUnique({
       where: { payflowId },
-      select: { payflowId: true, email: true },
+      select: { payflowId: true, email: true, displayName: true },
     });
   }
 
-  // Case-insensitive partial search on payflowId OR email prefix.
+  // Case-insensitive partial search on payflowId, email, OR displayName.
   // Excludes the requesting user. Returns at most `limit` results.
   findManyPublic(
     query: string,
@@ -96,11 +109,12 @@ export class UserRepository {
       where: {
         id: { not: excludeUserId },
         OR: [
-          { payflowId: { contains: query, mode: 'insensitive' } },
-          { email:      { contains: query, mode: 'insensitive' } },
+          { payflowId:   { contains: query, mode: 'insensitive' } },
+          { email:       { contains: query, mode: 'insensitive' } },
+          { displayName: { contains: query, mode: 'insensitive' } },
         ],
       },
-      select: { payflowId: true, email: true },
+      select: { payflowId: true, email: true, displayName: true },
       take: limit,
     });
   }
@@ -109,7 +123,7 @@ export class UserRepository {
   findPublicByIds(ids: string[]): Promise<(PublicUser & { id: string })[]> {
     return this.db.user.findMany({
       where: { id: { in: ids } },
-      select: { id: true, payflowId: true, email: true },
+      select: { id: true, payflowId: true, email: true, displayName: true },
     });
   }
 
@@ -188,6 +202,43 @@ export class UserRepository {
         passwordResetToken:  tokenHash,
         passwordResetExpiry: { gt: new Date() },
       },
+    });
+  }
+
+  // ── Profile update ─────────────────────────────────────────────────────────
+  // Updates the user's editable profile fields.  Only provided (non-undefined)
+  // fields are written — undefined keys are omitted from the Prisma data object.
+  async updateProfile(id: string, input: UpdateProfileInput): Promise<User> {
+    return this.db.user.update({
+      where: { id },
+      data: {
+        ...(input.displayName !== undefined && { displayName: input.displayName }),
+        ...(input.phone       !== undefined && { phone:       input.phone }),
+        ...(input.avatarUrl   !== undefined && { avatarUrl:   input.avatarUrl }),
+      },
+    });
+  }
+
+  // ── Preferences update ─────────────────────────────────────────────────────
+  async updatePreferences(id: string, input: UpdatePreferencesInput): Promise<User> {
+    return this.db.user.update({
+      where: { id },
+      data: {
+        ...(input.emailNotifications !== undefined && { emailNotifications: input.emailNotifications }),
+        ...(input.pushNotifications  !== undefined && { pushNotifications:  input.pushNotifications }),
+        ...(input.themePreference    !== undefined && { themePreference:    input.themePreference }),
+      },
+    });
+  }
+
+  // ── Logout all sessions ────────────────────────────────────────────────────
+  // Clears the refresh token hash — equivalent to logout but used when the
+  // caller wants to invalidate ALL sessions (e.g. password change or explicit
+  // "logout from all devices").
+  async clearAllSessions(id: string): Promise<User> {
+    return this.db.user.update({
+      where: { id },
+      data: { refreshTokenHash: null },
     });
   }
 }

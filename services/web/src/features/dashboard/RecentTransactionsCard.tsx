@@ -105,10 +105,12 @@ export function RecentTransactionsCard() {
                 : (kind === 'received' ? `From ${counterparty}` : `To ${counterparty}`);
 
               return (
-                <motion.div
+                <motion.button
                   key={tx.id}
+                  type="button"
                   variants={rowVariants}
-                  className="flex items-center gap-3 px-4 py-3.5 transition-colors hover:bg-surface-muted/50"
+                  onClick={() => navigate(`/transactions/${tx.id}`)}
+                  className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-surface-muted/50 focus-visible:bg-surface-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-600/50"
                 >
                   {/* Avatar */}
                   <Avatar
@@ -148,7 +150,7 @@ export function RecentTransactionsCard() {
                       {tx.type === 'ADD_MONEY' ? 'Added' : (kind === 'received' ? 'Received' : 'Sent')}
                     </Badge>
                   </div>
-                </motion.div>
+                </motion.button>
               );
             })}
           </motion.div>

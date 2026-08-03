@@ -22,6 +22,7 @@ import { NotificationRepository } from '../repositories/notification.repository'
 import { NotificationType } from './notification.service';
 import { ConflictError, InternalServerError, UnauthorizedError, NotFoundError, BadRequestError } from '../utils/errors';
 import { registerSchema, loginSchema, forgotPasswordSchema, resetPasswordSchema } from '../validators/auth.validator';
+import { changePasswordSchema, updateProfileSchema, updatePreferencesSchema } from '../validators/auth.validator';
 import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from '../utils/jwt';
 import { config } from '../config/env';
 import { generatePayflowId } from '../utils/payflow-id';
@@ -48,7 +49,45 @@ export interface MeResult {
   id: string;
   email: string;
   payflowId: string;
+  displayName: string | null;
+  phone: string | null;
+  avatarUrl: string | null;
+  emailNotifications: boolean;
+  pushNotifications: boolean;
+  themePreference: string;
   createdAt: Date;
+}
+
+export interface UpdateProfileInput {
+  displayName?: string | null | undefined;
+  phone?: string | null | undefined;
+  avatarUrl?: string | null | undefined;
+}
+
+export interface UpdateProfileResult {
+  id: string;
+  displayName: string | null;
+  phone: string | null;
+  avatarUrl: string | null;
+}
+
+export interface ChangePasswordInput {
+  userId: string;
+  currentPassword: string;
+  newPassword: string;
+}
+
+export interface UpdatePreferencesInput {
+  userId: string;
+  emailNotifications?: boolean | undefined;
+  pushNotifications?: boolean | undefined;
+  themePreference?: string | undefined;
+}
+
+export interface UpdatePreferencesResult {
+  emailNotifications: boolean;
+  pushNotifications: boolean;
+  themePreference: string;
 }
 
 export interface LoginInput {
@@ -347,7 +386,104 @@ export class AuthService {
       id: user.id,
       email: user.email,
       payflowId: user.payflowId,
+      displayName: (user as any).displayName ?? null,
+      phone: (user as any).phone ?? null,
+      avatarUrl: (user as any).avatarUrl ?? null,
+      emailNotifications: (user as any).emailNotifications ?? true,
+      pushNotifications: (user as any).pushNotifications ?? true,
+      themePreference: (user as any).themePreference ?? 'system',
       createdAt: user.createdAt,
+    };
+  }
+
+  // ── Update profile ─────────────────────────────────────────────────────────
+  async updateProfile(userId: string, input: UpdateProfileInput): Promise<UpdateProfileResult> {
+    const parsed = updateProfileSchema.parse(input);
+
+    const user = await this.userRepository.findById(userId);
+    if (user === null) throw new NotFoundError('User not found');
+
+    const updated = await this.userRepository.updateProfile(userId, {
+      displayName: parsed.displayName,
+      phone:       parsed.phone,
+      avatarUrl:   parsed.avatarUrl,
+    });
+
+    // Fire-and-forget PROFILE_UPDATED notification
+    if (this.notificationRepository) {
+      void this.notificationRepository.create({
+        userId,
+        type:  NotificationType.PROFILE_UPDATED,
+        title: 'Profile Updated',
+        body:  'Your PayFlow profile has been updated successfully.',
+      });
+    }
+
+    return {
+      id:          updated.id,
+      displayName: (updated as any).displayName ?? null,
+      phone:       (updated as any).phone ?? null,
+      avatarUrl:   (updated as any).avatarUrl ?? null,
+    };
+  }
+
+  // ── Change password ────────────────────────────────────────────────────────
+  async changePassword(input: ChangePasswordInput): Promise<{ message: string }> {
+    const parsed = changePasswordSchema.parse({
+      currentPassword: input.currentPassword,
+      newPassword:     input.newPassword,
+    });
+
+    const user = await this.userRepository.findById(input.userId);
+    if (user === null) throw new UnauthorizedError('User not found');
+
+    const match = await bcrypt.compare(parsed.currentPassword, user.passwordHash);
+    if (!match) throw new UnauthorizedError('Current password is incorrect');
+
+    const newHash = await bcrypt.hash(parsed.newPassword, config.BCRYPT_SALT_ROUNDS);
+    await this.userRepository.updatePassword(user.id, newHash);
+
+    // Fire-and-forget PASSWORD_CHANGED notification
+    if (this.notificationRepository) {
+      void this.notificationRepository.create({
+        userId: user.id,
+        type:   NotificationType.PASSWORD_CHANGED,
+        title:  'Password Changed',
+        body:   'Your PayFlow password was changed successfully. If this wasn\'t you, contact support immediately.',
+      });
+    }
+
+    return { message: 'Password changed successfully.' };
+  }
+
+  // ── Logout from all devices ────────────────────────────────────────────────
+  async logoutAll(userId: string): Promise<void> {
+    const user = await this.userRepository.findById(userId);
+    if (user === null) throw new UnauthorizedError('User not found');
+    await this.userRepository.clearAllSessions(user.id);
+  }
+
+  // ── Update preferences ─────────────────────────────────────────────────────
+  async updatePreferences(input: UpdatePreferencesInput): Promise<UpdatePreferencesResult> {
+    const parsed = updatePreferencesSchema.parse({
+      emailNotifications: input.emailNotifications,
+      pushNotifications:  input.pushNotifications,
+      themePreference:    input.themePreference,
+    });
+
+    const user = await this.userRepository.findById(input.userId);
+    if (user === null) throw new NotFoundError('User not found');
+
+    const updated = await this.userRepository.updatePreferences(user.id, {
+      emailNotifications: parsed.emailNotifications,
+      pushNotifications:  parsed.pushNotifications,
+      themePreference:    parsed.themePreference,
+    });
+
+    return {
+      emailNotifications: (updated as any).emailNotifications ?? true,
+      pushNotifications:  (updated as any).pushNotifications ?? true,
+      themePreference:    (updated as any).themePreference ?? 'system',
     };
   }
 }

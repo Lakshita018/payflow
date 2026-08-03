@@ -11,7 +11,7 @@
 import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useNotificationStore } from '@/store';
+import { useNotificationStore, useAuthStore } from '@/store';
 import type { NotificationItem } from '@/types';
 import { ROUTES } from '@/routes/paths';
 import { BellIcon } from './icons';
@@ -142,15 +142,20 @@ export function NotificationDropdown() {
     markRead,
     markAllRead,
   } = useNotificationStore();
+  // user is null on first render — must not default to `true` before the profile loads.
+  const notifUser = useAuthStore((s) => s.user);
+  const pushEnabled = notifUser !== null && (notifUser.pushNotifications ?? true);
+  // Suppress badge and auto-fetch when push notifications are disabled
+  const effectiveUnreadCount = pushEnabled ? unreadCount : 0;
 
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Fetch when opening
+  // Fetch when opening — only when push notifications are enabled
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && pushEnabled) {
       void fetchNotifications();
     }
-  }, [isOpen, fetchNotifications]);
+  }, [isOpen, fetchNotifications, pushEnabled]);
 
   // Close on click outside
   useEffect(() => {
@@ -181,19 +186,19 @@ export function NotificationDropdown() {
         type="button"
         onClick={() => setOpen(!isOpen)}
         className="relative inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-surface text-text-secondary shadow-xs transition-all duration-150 hover:border-border-strong hover:text-text-primary"
-        aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`}
+        aria-label={`Notifications${effectiveUnreadCount > 0 ? ` (${effectiveUnreadCount} unread)` : ''}`}
       >
         <BellIcon className="h-4 w-4" />
         {/* Unread badge */}
-        {unreadCount > 0 && (
+        {effectiveUnreadCount > 0 && (
           <motion.span
-            key={unreadCount}
+            key={effectiveUnreadCount}
             initial={{ scale: 0.5, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ type: 'spring', stiffness: 500, damping: 25 }}
             className="absolute -right-1 -top-1 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-rose-500 px-0.5 text-[10px] font-bold leading-none text-white ring-1 ring-surface"
           >
-            {unreadCount > 99 ? '99+' : unreadCount}
+            {effectiveUnreadCount > 99 ? '99+' : effectiveUnreadCount}
           </motion.span>
         )}
       </button>
@@ -212,13 +217,13 @@ export function NotificationDropdown() {
             <div className="flex items-center justify-between border-b border-border px-4 py-3">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-semibold text-text-primary">Notifications</span>
-                {unreadCount > 0 && (
+                {effectiveUnreadCount > 0 && (
                   <span className="rounded-full bg-brand-100 px-1.5 py-0.5 text-[10px] font-semibold text-brand-700 dark:bg-brand-900/30 dark:text-brand-400">
-                    {unreadCount} new
+                    {effectiveUnreadCount} new
                   </span>
                 )}
               </div>
-              {unreadCount > 0 && (
+              {effectiveUnreadCount > 0 && (
                 <button
                   type="button"
                   onClick={() => void markAllRead()}
@@ -231,7 +236,13 @@ export function NotificationDropdown() {
 
             {/* Body */}
             <div className="max-h-[26rem] overflow-y-auto">
-              {isFetching && notifications.length === 0 ? (
+              {!pushEnabled ? (
+                <div className="flex flex-col items-center justify-center gap-2 px-4 py-10">
+                  <BellIcon className="h-8 w-8 text-text-muted opacity-40" />
+                  <p className="text-sm text-text-muted">Push notifications are turned off.</p>
+                  <p className="text-xs text-text-muted">Enable them in Settings to see alerts here.</p>
+                </div>
+              ) : isFetching && notifications.length === 0 ? (
                 // Loading skeleton
                 <div className="space-y-0 divide-y divide-border">
                   {[1, 2, 3].map((i) => (

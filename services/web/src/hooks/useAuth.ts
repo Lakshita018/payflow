@@ -18,7 +18,7 @@
 //   await loginMutation.mutateAsync({ email, password });      // awaitable
 // ---------------------------------------------------------------------------
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authService } from '@/services';
 import { useAuthStore, useNotificationStore } from '@/store';
@@ -30,31 +30,46 @@ import type { User } from '@/types';
 export function useLoginMutation() {
   const { login } = useAuthStore();
   const navigate = useNavigate();
+  // rememberMe is captured at mutate()-call time via a ref so the onSuccess
+  // closure always sees the value the user chose, not a stale closure.
+  const rememberMeRef = useRef(false);
 
-  return useMutation({
-    mutationFn: authService.login,
+  const mutation = useMutation({
+    mutationFn: (vars: { email: string; password: string; rememberMe: boolean }) => {
+      rememberMeRef.current = vars.rememberMe;
+      return authService.login({ email: vars.email, password: vars.password });
+    },
     onSuccess: async (tokens) => {
-      // Temporarily store tokens so the /me call can attach the Bearer header
-      const partialUser: User = { id: '', email: '', payflowId: '', createdAt: new Date().toISOString() };
-      login({ accessToken: tokens.accessToken, refreshToken: tokens.refreshToken, user: partialUser });
+      const rememberMe = rememberMeRef.current;
+      // Temporarily store tokens so the /me call can attach the Bearer header.
+      const partialUser: User = { id: '', email: '', payflowId: '', displayName: null, phone: null, avatarUrl: null, emailNotifications: true, pushNotifications: true, themePreference: 'system', createdAt: new Date().toISOString() };
+      login({ accessToken: tokens.accessToken, refreshToken: tokens.refreshToken, user: partialUser, rememberMe });
 
-      // Fetch the real user profile immediately
+      // Fetch the real user profile immediately.
       try {
         const userProfile = await authService.me();
         const fullUser: User = {
           id: userProfile.id,
           email: userProfile.email,
           payflowId: userProfile.payflowId,
+          displayName: userProfile.displayName ?? null,
+          phone: userProfile.phone ?? null,
+          avatarUrl: userProfile.avatarUrl ?? null,
+          emailNotifications: userProfile.emailNotifications ?? true,
+          pushNotifications: userProfile.pushNotifications ?? true,
+          themePreference: userProfile.themePreference ?? 'system',
           createdAt: userProfile.createdAt,
         };
-        login({ accessToken: tokens.accessToken, refreshToken: tokens.refreshToken, user: fullUser });
+        login({ accessToken: tokens.accessToken, refreshToken: tokens.refreshToken, user: fullUser, rememberMe });
       } catch {
-        // /me failed — tokens are still valid, user navigates forward; profile will be re-fetched
+        // /me failed — tokens are still valid; profile will be re-fetched by useInitAuth.
       }
 
       void navigate(ROUTES.DASHBOARD, { replace: true });
     },
   });
+
+  return mutation;
 }
 
 // ── Register ─────────────────────────────────────────────────────────────────
@@ -125,6 +140,12 @@ export function useInitAuth() {
         id: data.id,
         email: data.email,
         payflowId: data.payflowId,
+        displayName: data.displayName ?? null,
+        phone: data.phone ?? null,
+        avatarUrl: data.avatarUrl ?? null,
+        emailNotifications: data.emailNotifications ?? true,
+        pushNotifications: data.pushNotifications ?? true,
+        themePreference: data.themePreference ?? 'system',
         createdAt: data.createdAt,
       };
       login({ accessToken, refreshToken: storedRefresh, user: fullUser });

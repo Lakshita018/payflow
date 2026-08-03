@@ -176,6 +176,7 @@ function toRecord(tx: Transaction): TransactionRecord {
     summaryDate: date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
     summaryTime: date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
     dateTime: `${date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} · ${date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`,
+    createdAt: date.toISOString(),
   };
 }
 

@@ -4,19 +4,24 @@ import { motion } from 'framer-motion';
 import { Sidebar } from './Sidebar';
 import { TopNavigation } from './TopNavigation';
 import { useInitAuth } from '@/hooks';
-import { useNotificationStore } from '@/store';
+import { useNotificationStore, useAuthStore } from '@/store';
 
 export function DashboardLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   useInitAuth();
 
-  // Poll unread count every 30 s so the badge stays fresh without a full page fetch.
+  // Poll unread count every 30 s — only once the user is loaded AND push notifications are enabled.
+  // user is null on first render (tokens in localStorage, /me not yet fetched), so we
+  // must wait for a non-null user before checking the preference to avoid defaulting to `true`.
   const refreshUnreadCount = useNotificationStore((s) => s.refreshUnreadCount);
+  const user = useAuthStore((s) => s.user);
+  const pushEnabled = user !== null && (user.pushNotifications ?? true);
   useEffect(() => {
+    if (!pushEnabled) return;
     void refreshUnreadCount();
     const id = setInterval(() => { void refreshUnreadCount(); }, 30_000);
     return () => clearInterval(id);
-  }, [refreshUnreadCount]);
+  }, [refreshUnreadCount, pushEnabled]);
 
   return (
     <div className="min-h-screen bg-surface-subtle text-text-primary lg:pl-[17rem]">

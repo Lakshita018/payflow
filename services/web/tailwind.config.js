@@ -4,6 +4,10 @@ module.exports = {
   darkMode: 'class',
   theme: {
     extend: {
+      screens: {
+        // xs = 480px — used to show the sparkline panel on small phones in landscape
+        xs: '480px',
+      },
       // ── Brand colours ──────────────────────────────────────────────────────
       colors: {
         brand: {

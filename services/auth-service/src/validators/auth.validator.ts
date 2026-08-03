@@ -65,3 +65,54 @@ export const resetPasswordSchema = z.object({
 });
 
 export type ResetPasswordSchema = z.infer<typeof resetPasswordSchema>;
+
+// ---------------------------------------------------------------------------
+// Change password — requires the current password plus a new one.
+// ---------------------------------------------------------------------------
+export const changePasswordSchema = z.object({
+  currentPassword: z
+    .string({ required_error: 'Current password is required' })
+    .min(1, 'Current password is required'),
+  newPassword: z
+    .string({ required_error: 'New password is required' })
+    .min(8, 'New password must be at least 8 characters')
+    .max(128, 'New password must be at most 128 characters'),
+});
+
+export type ChangePasswordSchema = z.infer<typeof changePasswordSchema>;
+
+// ---------------------------------------------------------------------------
+// Update profile — all fields optional; null clears the value.
+// ---------------------------------------------------------------------------
+export const updateProfileSchema = z.object({
+  displayName: z
+    .string()
+    .max(64, 'Display name must be at most 64 characters')
+    .nullable()
+    .optional(),
+  phone: z
+    .string()
+    .max(20, 'Phone number must be at most 20 characters')
+    .nullable()
+    .optional(),
+  avatarUrl: z
+    .string()
+    // A 2 MB image becomes ~2.67 MB as a base64 data URI (base64 adds ~33%
+    // overhead). 3_000_000 chars matches the 3 MB Express body limit in app.ts.
+    .max(3_000_000, 'Avatar must be at most 2 MB')
+    .nullable()
+    .optional(),
+});
+
+export type UpdateProfileSchema = z.infer<typeof updateProfileSchema>;
+
+// ---------------------------------------------------------------------------
+// Update preferences
+// ---------------------------------------------------------------------------
+export const updatePreferencesSchema = z.object({
+  emailNotifications: z.boolean().optional(),
+  pushNotifications:  z.boolean().optional(),
+  themePreference:    z.enum(['light', 'dark', 'system']).optional(),
+});
+
+export type UpdatePreferencesSchema = z.infer<typeof updatePreferencesSchema>;
