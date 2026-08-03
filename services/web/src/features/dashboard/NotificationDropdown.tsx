@@ -16,6 +16,20 @@ import type { NotificationItem } from '@/types';
 import { ROUTES } from '@/routes/paths';
 import { BellIcon } from './icons';
 
+// Maps notification title → the page to navigate to on click.
+// Titles that are NOT listed here carry a transaction refId → go to /transactions/:id.
+const REQUEST_TITLE_ROUTES: Record<string, string> = {
+  // Receiver (payer) sees incoming requests
+  'Payment Request':   ROUTES.INCOMING_REQUESTS,
+  // Requester sees outgoing requests
+  'Request Sent':      ROUTES.OUTGOING_REQUESTS,
+  'Payment Received':  ROUTES.OUTGOING_REQUESTS,
+  'Request Declined':  ROUTES.OUTGOING_REQUESTS,
+  'Request Cancelled': ROUTES.OUTGOING_REQUESTS,
+  // Payer confirmation after approving — has a real transaction refId, keep as transaction detail
+  // 'Payment Sent' is intentionally NOT listed here so it routes to /transactions/:id
+};
+
 // ── Relative time helper ──────────────────────────────────────────────────────
 function relativeTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -95,9 +109,17 @@ function NotifRow({
 
   const handleClick = () => {
     if (!notification.isRead) onMarkRead(notification.id);
-    if (notification.refId) {
-      void navigate(`${ROUTES.TRANSACTIONS}/${notification.refId}`);
+    if (!notification.refId) return;
+
+    // If this title has an explicit request-page route, use it.
+    const requestRoute = REQUEST_TITLE_ROUTES[notification.title];
+    if (requestRoute !== undefined) {
+      void navigate(requestRoute);
+      return;
     }
+
+    // All other notifications carry a real transaction refId → transaction detail page.
+    void navigate(`${ROUTES.TRANSACTIONS}/${notification.refId}`);
   };
 
   return (

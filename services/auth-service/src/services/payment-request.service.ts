@@ -155,16 +155,28 @@ export class PaymentRequestService {
       expiresAt,
     });
 
-    // 6. Notify receiver
+    // 6. Notify both parties
     const requesterName =
       requester.displayName ?? requester.payflowId.split('@')[0] ?? requester.payflowId;
+    const receiverName =
+      receiver.displayName ?? receiver.payflowId.split('@')[0] ?? receiver.payflowId;
     const amtStr = amount.toFixed(2);
 
+    // Receiver (payer): "Lakshita requested ₹500 from you."
     this.notify(
       receiver.id,
       NotificationType.MONEY_RECEIVED,
       'Payment Request',
       `${requesterName} requested ₹${amtStr} from you.`,
+      pr.id,
+    );
+
+    // Requester: confirmation that their request was sent
+    this.notify(
+      requester.id,
+      NotificationType.MONEY_SENT,
+      'Request Sent',
+      `You requested ₹${amtStr} from ${receiverName}.`,
       pr.id,
     );
 
@@ -277,13 +289,25 @@ export class PaymentRequestService {
     // Fire-and-forget notifications
     const payerName =
       pr.receiver.displayName ?? pr.receiver.payflowId.split('@')[0] ?? pr.receiver.payflowId;
+    const requesterName =
+      pr.requester.displayName ?? pr.requester.payflowId.split('@')[0] ?? pr.requester.payflowId;
     const amtStr = pr.amount.toFixed(2);
 
+    // Requester (gets paid): "Rahul paid your request of ₹500."
     this.notify(
       pr.requesterId,
       NotificationType.MONEY_RECEIVED,
       'Payment Received',
       `${payerName} paid your request of ₹${amtStr}.`,
+      result.debitTransactionId,
+    );
+
+    // Payer (receiver of request): "You paid Lakshita's request of ₹500."
+    this.notify(
+      acceptingUserId,
+      NotificationType.MONEY_SENT,
+      'Payment Sent',
+      `You paid ${requesterName}'s request of ₹${amtStr}.`,
       result.debitTransactionId,
     );
 
@@ -305,16 +329,27 @@ export class PaymentRequestService {
 
     await this.paymentRequestRepository.updateStatus(requestId, 'REJECTED');
 
-    // Notify requester
     const rejectorName =
       pr.receiver.displayName ?? pr.receiver.payflowId.split('@')[0] ?? pr.receiver.payflowId;
+    const requesterName =
+      pr.requester.displayName ?? pr.requester.payflowId.split('@')[0] ?? pr.requester.payflowId;
     const amtStr = pr.amount.toFixed(2);
 
+    // Requester: "Rahul declined your request of ₹500."
     this.notify(
       pr.requesterId,
       NotificationType.MONEY_SENT,
       'Request Declined',
       `${rejectorName} declined your request of ₹${amtStr}.`,
+      requestId,
+    );
+
+    // Receiver (payer): "You declined Lakshita's request of ₹500."
+    this.notify(
+      pr.receiverId,
+      NotificationType.MONEY_SENT,
+      'Request Declined',
+      `You declined ${requesterName}'s request of ₹${amtStr}.`,
       requestId,
     );
   }
@@ -328,5 +363,27 @@ export class PaymentRequestService {
     if (pr.status !== 'PENDING') throw new ConflictError(`Request is already ${pr.status.toLowerCase()}`);
 
     await this.paymentRequestRepository.cancel(requestId);
+
+    const requesterName =
+      pr.requester.displayName ?? pr.requester.payflowId.split('@')[0] ?? pr.requester.payflowId;
+    const amtStr = pr.amount.toFixed(2);
+
+    // Requester: confirmation "You cancelled your request of ₹500 to Rahul."
+    this.notify(
+      pr.requesterId,
+      NotificationType.MONEY_SENT,
+      'Request Cancelled',
+      `You cancelled your request of ₹${amtStr} to ${pr.receiver.displayName ?? pr.receiver.payflowId.split('@')[0] ?? pr.receiver.payflowId}.`,
+      requestId,
+    );
+
+    // Receiver (payer): "Lakshita cancelled their request of ₹500."
+    this.notify(
+      pr.receiverId,
+      NotificationType.MONEY_RECEIVED,
+      'Request Cancelled',
+      `${requesterName} cancelled their request of ₹${amtStr}.`,
+      requestId,
+    );
   }
 }
