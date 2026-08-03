@@ -5,9 +5,10 @@
 # Runs on every Render deploy (and every Docker container start).
 # Steps:
 #   1. Apply any pending Prisma migrations — idempotent, safe to run every time.
-#      If the migration fails (e.g. bad DATABASE_URL), the script exits non-zero
-#      and Render marks the deploy as failed before the server ever starts,
-#      preventing a broken schema from serving traffic.
+#      Uses the custom migration runner instead of `prisma migrate deploy`
+#      because Render/Neon can time out on Prisma's advisory lock acquisition.
+#      If migration application fails, the script exits non-zero and Render marks
+#      the deploy as failed before the server ever starts.
 #   2. Start the compiled Node server.
 #
 # Why not run migrations at build time?
@@ -17,7 +18,7 @@
 set -e   # exit immediately on any error
 
 echo "[start.sh] Running Prisma migrations..."
-npx prisma migrate deploy
+node scripts/mark-migrations-applied.mjs
 
 echo "[start.sh] Migrations complete. Starting server..."
 exec node dist/server.js
