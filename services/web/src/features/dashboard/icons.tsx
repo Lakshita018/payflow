@@ -129,6 +129,36 @@ export function ArrowDownLeftIcon(props: IconProps) {
   );
 }
 
+export function RequestMoneyIcon(props: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" {...props}>
+      <path d="M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2Z" />
+      <path d="M12 8v4l2 2" />
+      <path d="M8 12h.01" />
+      <path d="M16 12h.01" />
+      <path d="M9.5 15.5a4 4 0 0 0 5 0" />
+    </svg>
+  );
+}
+
+export function InboxIcon(props: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" {...props}>
+      <path d="M22 12h-6l-2 3H10l-2-3H2" />
+      <path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11Z" />
+    </svg>
+  );
+}
+
+export function OutboxIcon(props: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" {...props}>
+      <polyline points="22 12 16 12 14 15 10 15 8 12 2 12" />
+      <path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
+    </svg>
+  );
+}
+
 export function ShieldIcon(props: IconProps) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" {...props}>

@@ -114,6 +114,40 @@ export interface RelationshipResult {
   recentTransactions: RelationshipTransaction[];
 }
 
+// ── Payment Requests ─────────────────────────────────────────────────────────
+export type PaymentRequestStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'CANCELLED' | 'EXPIRED';
+
+export interface PaymentRequestItem {
+  id: string;
+  requesterId: string;
+  receiverId: string;
+  requesterPayflowId: string;
+  requesterDisplayName: string;
+  requesterEmail: string;
+  receiverPayflowId: string;
+  receiverDisplayName: string;
+  receiverEmail: string;
+  amount: string;
+  note: string | null;
+  status: PaymentRequestStatus;
+  expiresAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreatePaymentRequestPayload {
+  receiverPayflowId: string;
+  amount: number;
+  note?: string;
+  expiresInHours?: number;
+}
+
+export interface AcceptPaymentRequestResult {
+  requestId: string;
+  transactionId: string;
+  newReceiverBalance: string;
+}
+
 // ── Notifications ─────────────────────────────────────────────────────────────
 export type NotificationType =
   | 'MONEY_RECEIVED'

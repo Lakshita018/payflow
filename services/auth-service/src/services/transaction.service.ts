@@ -189,7 +189,7 @@ export class TransactionService {
       });
 
       // Receiver's view: CREDIT (money arrived in their wallet)
-      await txClient.transaction.create({
+      const creditRecord = await txClient.transaction.create({
         data: {
           senderId: sender.id,
           receiverId: receiver.id,
@@ -201,7 +201,7 @@ export class TransactionService {
         },
       });
 
-      return { updatedSenderWallet, updatedReceiverWallet, debitRecord };
+      return { updatedSenderWallet, updatedReceiverWallet, debitRecord, creditRecord };
     });
 
     // 8. Return result — expose sender's DEBIT record id as the primary transactionId
@@ -222,7 +222,7 @@ export class TransactionService {
       NotificationType.MONEY_RECEIVED,
       'Money Received',
       `You received ₹${amtStr} from ${senderDisplayName}.`,
-      result.debitRecord.id,
+      result.creditRecord.id,
     );
 
     return {

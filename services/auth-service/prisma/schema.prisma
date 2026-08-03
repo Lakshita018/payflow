@@ -30,12 +30,14 @@ model User {
   themePreference         String             @default("system")
   createdAt               DateTime           @default(now())
   updatedAt               DateTime           @updatedAt
-  favouritedBy         FavouriteContact[] @relation("FavouritedUsers")
-  favourites           FavouriteContact[] @relation("UserFavourites")
-  receivedTransactions Transaction[]      @relation("ReceivedTransactions")
-  sentTransactions     Transaction[]      @relation("SentTransactions")
-  wallet               Wallet?
-  notifications        Notification[]
+  favouritedBy              FavouriteContact[] @relation("FavouritedUsers")
+  favourites                FavouriteContact[] @relation("UserFavourites")
+  receivedTransactions      Transaction[]      @relation("ReceivedTransactions")
+  sentTransactions          Transaction[]      @relation("SentTransactions")
+  wallet                    Wallet?
+  notifications             Notification[]
+  incomingPaymentRequests   PaymentRequest[]   @relation("ReceivedRequests")
+  outgoingPaymentRequests   PaymentRequest[]   @relation("SentRequests")
 
   @@map("users")
 }
@@ -98,4 +100,25 @@ model Notification {
 
   @@index([userId, createdAt(sort: Desc)])
   @@map("notifications")
+}
+
+/// PENDING | ACCEPTED | REJECTED | CANCELLED | EXPIRED
+model PaymentRequest {
+  id          String    @id @default(uuid())
+  requesterId String
+  receiverId  String
+  amount      Decimal   @db.Decimal(18, 2)
+  note        String?
+  /// PENDING | ACCEPTED | REJECTED | CANCELLED | EXPIRED
+  status      String    @default("PENDING")
+  /// Optional expiry — if set, request is treated as EXPIRED after this date
+  expiresAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  requester   User      @relation("SentRequests",     fields: [requesterId], references: [id], onDelete: Cascade)
+  receiver    User      @relation("ReceivedRequests", fields: [receiverId],  references: [id], onDelete: Cascade)
+
+  @@index([receiverId, createdAt(sort: Desc)])
+  @@index([requesterId, createdAt(sort: Desc)])
+  @@map("payment_requests")
 }

@@ -32,6 +32,9 @@ import { FavouritesPage }          from '@/pages/FavouritesPage';
 import { SettingsPage }            from '@/pages/SettingsPage';
 import { NotFoundPage }            from '@/pages/NotFoundPage';
 import { UserProfilePage }         from '@/pages/UserProfilePage';
+import { RequestMoneyPage }        from '@/pages/RequestMoneyPage';
+import { IncomingRequestsPage }    from '@/pages/IncomingRequestsPage';
+import { OutgoingRequestsPage }    from '@/pages/OutgoingRequestsPage';
 
 export const router = createBrowserRouter([
   // ── Root redirect ──────────────────────────────────────────────────────────
@@ -87,6 +90,9 @@ export const router = createBrowserRouter([
           { path: ROUTES.PROFILE,             element: <ProfilePage /> },
           { path: ROUTES.SETTINGS,            element: <SettingsPage /> },
           { path: ROUTES.USER_PROFILE,        element: <UserProfilePage /> },
+          { path: ROUTES.REQUEST_MONEY,       element: <RequestMoneyPage /> },
+          { path: ROUTES.INCOMING_REQUESTS,   element: <IncomingRequestsPage /> },
+          { path: ROUTES.OUTGOING_REQUESTS,   element: <OutgoingRequestsPage /> },
         ],
       },
     ],

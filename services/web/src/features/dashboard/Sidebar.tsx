@@ -8,10 +8,10 @@ import {
   ChevronRightIcon,
   ContactsIcon,
   DashboardIcon,
+  InboxIcon,
   LogoMark,
-  ProfileIcon,
+  RequestMoneyIcon,
   SendMoneyIcon,
-  SettingsIcon,
   TransactionsIcon,
 } from './icons';
 
@@ -21,12 +21,12 @@ type SidebarProps = {
 };
 
 const navItems = [
-  { label: 'Dashboard',          path: ROUTES.DASHBOARD,    icon: DashboardIcon },
-  { label: 'Transactions',       path: ROUTES.TRANSACTIONS, icon: TransactionsIcon },
-  { label: 'Send Money',         path: ROUTES.SEND_MONEY,   icon: SendMoneyIcon },
-  { label: 'Favourite Contacts', path: ROUTES.FAVOURITES,   icon: ContactsIcon },
-  { label: 'Profile',            path: ROUTES.PROFILE,      icon: ProfileIcon },
-  { label: 'Settings',           path: ROUTES.SETTINGS,     icon: SettingsIcon },
+  { label: 'Dashboard',          path: ROUTES.DASHBOARD,         icon: DashboardIcon },
+  { label: 'Transactions',       path: ROUTES.TRANSACTIONS,      icon: TransactionsIcon },
+  { label: 'Send Money',         path: ROUTES.SEND_MONEY,        icon: SendMoneyIcon },
+  { label: 'Request Money',      path: ROUTES.REQUEST_MONEY,     icon: RequestMoneyIcon },
+  { label: 'Incoming Requests',  path: ROUTES.INCOMING_REQUESTS, icon: InboxIcon },
+  { label: 'Favourite Contacts', path: ROUTES.FAVOURITES,        icon: ContactsIcon },
 ];
 
 function LogoutIcon() {

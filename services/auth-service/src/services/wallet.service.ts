@@ -92,9 +92,11 @@ export class WalletService {
     const decimal = new Prisma.Decimal(validated);
     const updated = await this.walletRepository.credit(userId, decimal);
 
+    let topUpTransactionId: string | undefined;
+
     // Record an ADD_MONEY transaction (sender = receiver = userId, CREDIT direction)
     if (this.transactionRepository) {
-      await this.transactionRepository.create({
+      const topUpTransaction = await this.transactionRepository.create({
         senderId: userId,
         receiverId: userId,
         amount: decimal,
@@ -103,6 +105,7 @@ export class WalletService {
         direction: 'CREDIT',
         note: 'Added to wallet',
       });
+      topUpTransactionId = topUpTransaction.id;
     }
 
     // Fire-and-forget wallet top-up notification
@@ -112,6 +115,7 @@ export class WalletService {
         type:  NotificationType.WALLET_TOPPED_UP,
         title: 'Wallet Topped Up',
         body:  `₹${validated.toFixed(2)} has been added to your PayFlow wallet.`,
+        ...(topUpTransactionId !== undefined && { refId: topUpTransactionId }),
       });
     }
 
