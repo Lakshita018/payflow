@@ -71,7 +71,7 @@ function StatTile({ label, value, iconBg, icon, index = 0 }: StatTileProps) {
       whileHover={{ scale: 1.035, transition: { duration: 0.18 } }}
       whileTap={{ scale: 0.97 }}
     >
-      <Card variant="elevated" className="flex items-center gap-4 p-4 sm:p-5 cursor-default">
+      <Card variant="elevated" className="flex h-full items-center gap-4 p-4 sm:p-5 cursor-default">
         <motion.span
           className={['flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl', iconBg].join(' ')}
           initial={{ scale: 0.55, opacity: 0 }}
@@ -203,7 +203,7 @@ export function DashboardPage() {
         </div>
 
         {/* Stat tiles — stacked 2×2 in the narrower column */}
-        <div className="grid grid-cols-2 gap-4 min-[1100px]:col-span-2">
+        <div className="grid auto-rows-fr grid-cols-2 gap-4 min-[1100px]:col-span-2">
           {statTiles.map((tile, i) => (
             <StatTile key={tile.label} {...tile} index={i} />
           ))}

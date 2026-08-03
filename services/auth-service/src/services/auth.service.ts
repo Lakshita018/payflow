@@ -17,6 +17,7 @@
 import crypto from 'crypto';
 import bcrypt from 'bcrypt';
 import { UserRepository } from '../repositories/user.repository';
+import { User } from '../generated/prisma/client';
 import { WalletRepository } from '../repositories/wallet.repository';
 import { NotificationRepository } from '../repositories/notification.repository';
 import { NotificationType } from './notification.service';
@@ -32,6 +33,20 @@ import { logger } from '../config/logger';
 // ---------------------------------------------------------------------------
 // Input / output types
 // ---------------------------------------------------------------------------
+
+type ProfileUserFields = User & {
+  displayName: string | null;
+  phone: string | null;
+  avatarUrl: string | null;
+};
+
+type PreferenceUserFields = User & {
+  emailNotifications: boolean;
+  pushNotifications: boolean;
+  themePreference: string;
+};
+
+type UserWithProfileAndPreferences = ProfileUserFields & PreferenceUserFields;
 
 export interface RegisterInput {
   email: string;
@@ -382,16 +397,17 @@ export class AuthService {
     if (user === null) {
       throw new NotFoundError('User not found');
     }
+    const profile = user as UserWithProfileAndPreferences;
     return {
       id: user.id,
       email: user.email,
       payflowId: user.payflowId,
-      displayName: (user as any).displayName ?? null,
-      phone: (user as any).phone ?? null,
-      avatarUrl: (user as any).avatarUrl ?? null,
-      emailNotifications: (user as any).emailNotifications ?? true,
-      pushNotifications: (user as any).pushNotifications ?? true,
-      themePreference: (user as any).themePreference ?? 'system',
+      displayName: profile.displayName ?? null,
+      phone: profile.phone ?? null,
+      avatarUrl: profile.avatarUrl ?? null,
+      emailNotifications: profile.emailNotifications ?? true,
+      pushNotifications: profile.pushNotifications ?? true,
+      themePreference: profile.themePreference ?? 'system',
       createdAt: user.createdAt,
     };
   }
@@ -407,7 +423,7 @@ export class AuthService {
       displayName: parsed.displayName,
       phone:       parsed.phone,
       avatarUrl:   parsed.avatarUrl,
-    });
+    }) as ProfileUserFields;
 
     // Fire-and-forget PROFILE_UPDATED notification
     if (this.notificationRepository) {
@@ -421,9 +437,9 @@ export class AuthService {
 
     return {
       id:          updated.id,
-      displayName: (updated as any).displayName ?? null,
-      phone:       (updated as any).phone ?? null,
-      avatarUrl:   (updated as any).avatarUrl ?? null,
+      displayName: updated.displayName ?? null,
+      phone:       updated.phone ?? null,
+      avatarUrl:   updated.avatarUrl ?? null,
     };
   }
 
@@ -478,12 +494,12 @@ export class AuthService {
       emailNotifications: parsed.emailNotifications,
       pushNotifications:  parsed.pushNotifications,
       themePreference:    parsed.themePreference,
-    });
+    }) as PreferenceUserFields;
 
     return {
-      emailNotifications: (updated as any).emailNotifications ?? true,
-      pushNotifications:  (updated as any).pushNotifications ?? true,
-      themePreference:    (updated as any).themePreference ?? 'system',
+      emailNotifications: updated.emailNotifications ?? true,
+      pushNotifications:  updated.pushNotifications ?? true,
+      themePreference:    updated.themePreference ?? 'system',
     };
   }
 }

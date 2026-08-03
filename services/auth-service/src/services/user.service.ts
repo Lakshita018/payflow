@@ -109,7 +109,7 @@ export class UserService {
     // PayFlow ID is valid, so walletExists mirrors user found.
     const walletExists = true;
     return {
-      displayName: displayNameFrom(user.payflowId, (user as any).displayName),
+      displayName: displayNameFrom(user.payflowId, user.displayName),
       payflowId: user.payflowId,
       avatar: null,
       walletExists,
@@ -221,7 +221,7 @@ export class UserService {
     }
     const isFav = await this.favouriteRepository.isFavourite(requestingUserId, user.id);
     return {
-      displayName: displayNameFrom(user.payflowId, (user as any).displayName),
+      displayName: displayNameFrom(user.payflowId, user.displayName),
       payflowId: user.payflowId,
       email: user.email,
       avatar: null,
