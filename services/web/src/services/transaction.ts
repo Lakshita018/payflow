@@ -26,10 +26,24 @@ export interface TransferRequest {
   receiverPayflowId: string;
   amount: number;
   note?: string;
+  /**
+   * Client-generated UUID that guarantees exactly-once execution.
+   * Generate with `crypto.randomUUID()` before the first attempt and
+   * reuse the **same key** on every retry for this transfer.
+   * When provided, the backend sends it as the `Idempotency-Key` header.
+   */
+  idempotencyKey?: string;
 }
 
 /** POST /api/v1/transactions/transfer → TransferResult */
 export async function transfer(payload: TransferRequest): Promise<TransferResult> {
-  const { data } = await apiClient.post<TransferResult>('/api/v1/transactions/transfer', payload);
+  const { idempotencyKey, ...body } = payload;
+  const { data } = await apiClient.post<TransferResult>(
+    '/api/v1/transactions/transfer',
+    body,
+    idempotencyKey
+      ? { headers: { 'Idempotency-Key': idempotencyKey } }
+      : undefined,
+  );
   return data;
 }

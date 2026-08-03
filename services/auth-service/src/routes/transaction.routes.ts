@@ -1,6 +1,7 @@
 // ---------------------------------------------------------------------------
 // Transaction routes — composition root for the transfer + history features.
 //   prisma → UserRepository + WalletRepository + TransactionRepository
+//          + IdempotencyRepository → IdempotencyService
 //          → TransactionService → TransactionController
 // Mounted at /api/v1/transactions in app.ts.
 // ---------------------------------------------------------------------------
@@ -10,7 +11,9 @@ import { UserRepository } from '../repositories/user.repository';
 import { WalletRepository } from '../repositories/wallet.repository';
 import { TransactionRepository } from '../repositories/transaction.repository';
 import { NotificationRepository } from '../repositories/notification.repository';
+import { IdempotencyRepository } from '../repositories/idempotency.repository';
 import { TransactionService } from '../services/transaction.service';
+import { IdempotencyService } from '../services/idempotency.service';
 import { TransactionController } from '../controllers/transaction.controller';
 import { createAuthMiddleware } from '../middlewares/auth.middleware';
 
@@ -18,12 +21,15 @@ const userRepository         = new UserRepository(prisma);
 const walletRepository       = new WalletRepository(prisma);
 const transactionRepository  = new TransactionRepository(prisma);
 const notificationRepository = new NotificationRepository(prisma);
+const idempotencyRepository  = new IdempotencyRepository(prisma);
+const idempotencyService     = new IdempotencyService(idempotencyRepository);
 const transactionService     = new TransactionService(
   prisma,
   userRepository,
   walletRepository,
   transactionRepository,
   notificationRepository,
+  idempotencyService,
 );
 const transactionController = new TransactionController(transactionService);
 

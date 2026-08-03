@@ -18,16 +18,26 @@ export class TransactionController {
   }
 
   // POST /api/v1/transactions/transfer
+  // Headers: Idempotency-Key: <uuid>  (strongly recommended; omitting it disables protection)
   // Body: { receiverPayflowId, amount, note? }
   // 200 OK → { transactionId, senderBalance, receiverBalance, receiverName, receiverPayflowId }
+  // 200 OK (replay) → same response as the original request
+  // 409 Conflict → same Idempotency-Key used with a different payload
   async transfer(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       if (!req.user) { throw new UnauthorizedError(); }
+
+      // Extract idempotency key from the standard header.
+      const idempotencyKey = typeof req.headers['idempotency-key'] === 'string'
+        ? req.headers['idempotency-key']
+        : undefined;
+
       const transferInput: {
         senderUserId: string;
         receiverPayflowId: string;
         amount: number;
         note?: string;
+        idempotencyKey?: string;
       } = {
         senderUserId: req.user.id,
         receiverPayflowId: req.body.receiverPayflowId as string,
@@ -35,6 +45,9 @@ export class TransactionController {
       };
       if (typeof req.body.note === 'string') {
         transferInput.note = req.body.note;
+      }
+      if (idempotencyKey !== undefined) {
+        transferInput.idempotencyKey = idempotencyKey;
       }
       const result = await this.transactionService.transferMoney(transferInput);
       res.status(StatusCodes.OK).json(result);

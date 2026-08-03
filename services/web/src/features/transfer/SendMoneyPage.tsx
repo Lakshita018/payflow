@@ -172,6 +172,12 @@ export function SendMoneyPage() {
   const [lastReceiverContactId, setLastReceiverContactId] = useState<string>('');
   const [transferError, setTransferError] = useState('');
 
+  // Idempotency key — generated once per transfer attempt, reused on retry.
+  // A new key is generated only after a successful transfer or when the user
+  // resets the form (handleDone), preventing double-spend on double-click /
+  // network retry / browser back-forward.
+  const [idempotencyKey, setIdempotencyKey] = useState<string>(() => crypto.randomUUID());
+
   // Recipient lookup query
   const { data: recipient, isLoading: lookupLoading, isError: lookupError } = useQuery({
     queryKey: ['recipient', lookupQuery],
@@ -289,14 +295,20 @@ export function SendMoneyPage() {
     if (!recipient || !recipientConfirmed) return;
     if (numericAmount <= 0) { setTransferError('Please enter a valid amount.'); return; }
     setTransferError('');
+    // Include the idempotency key so the backend deduplicates retries.
+    // The same key is reused on every retry for this transfer attempt.
     transferMutation.mutate({
       receiverPayflowId: recipient.payflowId,
       amount: numericAmount,
       note: message || undefined,
+      idempotencyKey,
     });
   };
 
   const handleDone = () => {
+    // Rotate the idempotency key so the next transfer gets a fresh UUID.
+    setIdempotencyKey(crypto.randomUUID());
+
     // If we came from a user profile page, prefetch the now-stale profile data
     // then navigate so the profile page renders with fresh data immediately
     // (no skeleton flash, no stale totals).

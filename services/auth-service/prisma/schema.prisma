@@ -38,6 +38,7 @@ model User {
   notifications             Notification[]
   incomingPaymentRequests   PaymentRequest[]   @relation("ReceivedRequests")
   outgoingPaymentRequests   PaymentRequest[]   @relation("SentRequests")
+  idempotencyKeys           IdempotencyKey[]
 
   @@map("users")
 }
@@ -121,4 +122,30 @@ model PaymentRequest {
   @@index([receiverId, createdAt(sort: Desc)])
   @@index([requesterId, createdAt(sort: Desc)])
   @@map("payment_requests")
+}
+
+/// Idempotency fence for money-transfer operations.
+/// One record per (userId, idempotencyKey); the unique constraint is the lock.
+/// requestHash detects payload mismatches → 409.
+/// response stores the JSON-serialised success payload for replay.
+/// expiresAt defaults to 24 h after creation; rows past this date are eligible
+/// for cleanup by the scheduled purge job.
+model IdempotencyKey {
+  id             String   @id @default(uuid())
+  idempotencyKey String
+  userId         String
+  /// SHA-256 hex of the canonical request body
+  requestHash    String
+  /// JSON-serialised TransferResult for idempotent replay
+  response       String
+  /// COMPLETED (only state for now; future-proof for IN_FLIGHT)
+  status         String   @default("COMPLETED")
+  createdAt      DateTime @default(now())
+  /// Keys expire 24 h after creation
+  expiresAt      DateTime
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, idempotencyKey])
+  @@index([expiresAt])
+  @@map("idempotency_keys")
 }
