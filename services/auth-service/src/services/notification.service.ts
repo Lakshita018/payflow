@@ -71,12 +71,10 @@ export class NotificationService {
   }): Promise<void> {
     // Create the notification in the database
     const notification = await this.notificationRepository.create(input);
-    console.log('[NOTIFICATION CREATED]', notification.id, notification.userId);
 
     // Broadcast to SSE listeners (if service available)
     if (this.sseService) {
-      console.log('[BROADCASTING]', notification.id);
-      await this.sseService.broadcast(input.userId, {
+      this.sseService.broadcast(input.userId, {
         id:        notification.id,
         type:      notification.type,
         title:     notification.title,

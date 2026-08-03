@@ -34,8 +34,8 @@ export class SSEService {
     if (!this.connections.has(userId)) {
       this.connections.set(userId, new Set());
     }
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     this.connections.get(userId)!.add(res);
-    console.log('[SSE REGISTERED] Connected user:', userId, '| Total connections for user:', this.connections.get(userId)!.size);
   }
 
   // ── Remove a connection (called on disconnect) ──────────────────────────────
@@ -50,9 +50,8 @@ export class SSEService {
   }
 
   // ── Broadcast a notification to all active connections for a user ──────────
-  async broadcast(userId: string, notification: NotificationMessage): Promise<void> {
+  broadcast(userId: string, notification: NotificationMessage): void {
     const userConnections = this.connections.get(userId);
-    console.log('[ACTIVE CONNECTIONS]', userId, userConnections?.size ?? 0);
     if (!userConnections || userConnections.size === 0) {
       return;
     }
@@ -62,14 +61,12 @@ export class SSEService {
 
     for (const res of userConnections) {
       try {
-        console.log('[WRITING EVENT]', notification.id);
         res.write(message);
         // Flush the write immediately so the event reaches the client without
         // waiting for Node's internal socket buffer to drain on its own.
         if (typeof (res as unknown as { flush?: () => void }).flush === 'function') {
           (res as unknown as { flush: () => void }).flush();
         }
-        console.log('[EVENT WRITTEN]');
       } catch {
         // If write fails, mark for removal
         failedConnections.push(res);

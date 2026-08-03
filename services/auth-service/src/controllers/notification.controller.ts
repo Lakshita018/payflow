@@ -76,7 +76,7 @@ export class NotificationController {
   // Establishes a persistent connection that broadcasts new notifications
   // to the authenticated user in real-time.
   // 200 OK → text/event-stream
-  async stream(req: Request, res: Response, next: NextFunction): Promise<void> {
+  stream(req: Request, res: Response, next: NextFunction): void {
     try {
       if (!req.user) { throw new UnauthorizedError(); }
       const userId = req.user.id;
