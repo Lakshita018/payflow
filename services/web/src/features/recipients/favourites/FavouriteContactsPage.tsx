@@ -414,11 +414,12 @@ export function FavouriteContactsPage() {
   const [sortOpen, setSortOpen] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
 
-  // Load real favourites from backend
+  // Load real favourites from backend — staleTime:0 so the list is always
+  // fresh when the page mounts (e.g. after adding a contact in the modal).
   const { data: apiFavourites = [] } = useQuery({
     queryKey: ['favourites'],
     queryFn: userService.getFavourites,
-    staleTime: 60_000,
+    staleTime: 0,
   });
 
   // Map API favourites to the ContactEntry shape

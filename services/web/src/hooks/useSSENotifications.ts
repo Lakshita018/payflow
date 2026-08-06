@@ -121,8 +121,9 @@ export function useSSENotifications(): void {
     }
   }, [addNotification, refreshUnreadCount, toast]);
 
-  // Connect once when authenticated; disconnect and reset singleton on logout
-  // or unmount so re-login always opens a fresh SSE connection.
+  // Connect once when authenticated; fully close and reset singleton on every
+  // cleanup so React StrictMode's double-mount, tab switches, and logout all
+  // start with a fresh connection bound to the current callback.
   useEffect(() => {
     if (!isAuthenticated) {
       // Ensure singleton is reset when the user logs out
@@ -130,13 +131,16 @@ export function useSSENotifications(): void {
       return;
     }
 
+    // Always reset before creating so we never reuse a partially-closed
+    // singleton whose readStream loop may still hold a stale callback ref.
+    resetSSEClient();
     const sseClient = createSSEClient();
     void sseClient.connect(handleNotification);
 
     return () => {
-      // Disconnect (abort fetch) but keep singleton alive so a tab-switch
-      // or StrictMode double-mount doesn't fully destroy the connection.
-      sseClient.disconnect();
+      // Full close (sets isClosed=true + aborts) so the readStream loop
+      // exits cleanly and scheduleReconnect is suppressed.
+      resetSSEClient();
     };
   }, [isAuthenticated, handleNotification]);
 }

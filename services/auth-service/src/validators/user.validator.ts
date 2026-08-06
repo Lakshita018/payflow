@@ -7,6 +7,7 @@ import { z } from 'zod';
 export const searchQuerySchema = z.object({
   q: z
     .string({ required_error: 'Search query is required' })
+    .trim()
     .min(1, 'Search query must not be empty')
     .max(100, 'Search query must be at most 100 characters'),
 });

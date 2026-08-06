@@ -38,7 +38,14 @@ export class UserController {
   async search(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       if (!req.user) { throw new UnauthorizedError(); }
-      const result = await this.userService.search(req.query.q as string, req.user.id);
+      // Guard: q must be a plain string — Express can parse it as an array or
+      // object if the query string is malformed (e.g. ?q[]=a&q[]=b).
+      const raw = req.query.q;
+      if (typeof raw !== 'string' || raw.trim() === '') {
+        res.status(StatusCodes.OK).json([]);
+        return;
+      }
+      const result = await this.userService.search(raw.trim(), req.user.id);
       res.status(StatusCodes.OK).json(result);
     } catch (err) {
       next(err);

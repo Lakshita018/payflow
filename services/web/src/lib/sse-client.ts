@@ -55,9 +55,10 @@ export function setAuthTokenGetter(getter: () => string | null): void {
 
 // Read VITE_API_BASE_URL at module evaluation time so the SSE client
 // uses the same backend URL as the axios client in production.
-// Falls back to the Vite dev-proxy path ('/api/v1') for local development.
+// Falls back to the same default as axios.ts (http://localhost:3001) for
+// local development so the Vite proxy is not required for SSE.
 const DEFAULT_BASE_URL =
-  ((import.meta.env.VITE_API_BASE_URL as string | undefined) ?? '').replace(/\/$/, '') + '/api/v1';
+  ((import.meta.env.VITE_API_BASE_URL as string | undefined) || 'http://localhost:3001').replace(/\/$/, '') + '/api/v1';
 
 export class SSEClient {
   private abortController: AbortController | null = null;

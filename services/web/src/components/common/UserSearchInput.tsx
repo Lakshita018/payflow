@@ -4,16 +4,11 @@
 //
 // Behaviour (mirrors the dashboard TopNavigation search):
 //   • Shows recent contacts when the field is empty (if provided)
-//   • Fires userService.search() after a 300 ms debounce on every keystroke
+//   • Fires userService.search() after a 250 ms debounce on every keystroke
+//   • Spinner shows immediately while the user types (before debounce fires)
+//   • Distinguishes API errors from genuine "no results"
 //   • Dropdown disappears when a user is selected or the field loses focus
 //   • Keyboard: ArrowUp/Down to navigate, Enter to confirm, Escape to close
-//
-// Usage:
-//   <UserSearchInput
-//     placeholder="Search by name or PayFlow ID…"
-//     onSelect={(profile) => setRecipient(profile)}
-//     recentContacts={recentContacts}      // optional
-//   />
 // ---------------------------------------------------------------------------
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -47,25 +42,33 @@ export function UserSearchInput({
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const debounced = useDebounce(value, 300);
-  const trimmed = debounced.trim();
+  // Use a shorter debounce so results arrive quickly
+  const debounced = useDebounce(value.trim(), 250);
 
   // Live search results
-  const { data: results = [], isFetching } = useQuery<PublicProfile[]>({
-    queryKey: ['user-search-input', trimmed],
-    queryFn: () => userService.search(trimmed),
-    enabled: trimmed.length >= 1,
+  const { data: results = [], isFetching, isError } = useQuery<PublicProfile[]>({
+    queryKey: ['user-search-input', debounced],
+    queryFn: () => userService.search(debounced),
+    enabled: debounced.length >= 1,
     staleTime: 15_000,
+    retry: 1,
     placeholderData: (prev) => prev,
   });
 
-  // Items shown in the dropdown
-  const showSearch = trimmed.length >= 1;
-  const items: PublicProfile[] = showSearch
-    ? results
-    : recentContacts.slice(0, 5);
+  // Is the user currently typing (value has text but debounce hasn't fired yet)?
+  const isTyping = value.trim() !== debounced;
 
-  const showDropdown = open && (items.length > 0 || (showSearch && !isFetching));
+  // Items shown in the dropdown
+  const hasQuery  = debounced.length >= 1;
+  const items: PublicProfile[] = hasQuery ? results : recentContacts.slice(0, 5);
+
+  // Show dropdown when:
+  //  - open and field has text (always show spinner/results/error state), OR
+  //  - open and no text but recent contacts exist
+  const showDropdown = open && (value.trim().length > 0 || recentContacts.length > 0);
+
+  // Show spinner while typing OR while fetching
+  const showSpinner = isFetching || isTyping && debounced.length >= 1;
 
   // Close on outside click
   useEffect(() => {
@@ -106,7 +109,7 @@ export function UserSearchInput({
     }
   }
 
-  const sectionLabel = showSearch ? 'Results' : 'Recent';
+  const sectionLabel = hasQuery ? 'Results' : 'Recent';
 
   return (
     <div ref={containerRef} className={`relative ${className}`}>
@@ -137,8 +140,8 @@ export function UserSearchInput({
           className="input w-full pl-10 pr-9"
         />
 
-        {/* Spinner */}
-        {isFetching && (
+        {/* Spinner — shown while typing or waiting for results */}
+        {showSpinner && (
           <span className="absolute inset-y-0 right-3 flex items-center">
             <svg className="h-4 w-4 animate-spin text-text-muted" viewBox="0 0 24 24" fill="none">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
@@ -151,6 +154,19 @@ export function UserSearchInput({
       {/* Dropdown */}
       {showDropdown && (
         <div className="absolute left-0 top-[calc(100%+6px)] z-50 w-full overflow-hidden rounded-2xl border border-border bg-surface shadow-xl">
+
+          {/* While typing / fetching — only show label if there are already stale results */}
+          {(isFetching || isTyping) && items.length === 0 && (
+            <p className="px-3 py-3 text-sm text-text-muted">Searching…</p>
+          )}
+
+          {/* API error state */}
+          {isError && !isFetching && !isTyping && (
+            <p className="px-3 py-3 text-sm text-danger">
+              Could not connect to search. Check your connection and try again.
+            </p>
+          )}
+
           {/* Section label */}
           {items.length > 0 && (
             <p className="px-3 pt-2.5 pb-1 text-[0.6875rem] font-semibold uppercase tracking-[0.1em] text-text-muted">
@@ -186,10 +202,10 @@ export function UserSearchInput({
             );
           })}
 
-          {/* No results message */}
-          {showSearch && !isFetching && results.length === 0 && (
+          {/* Genuine no-results — only shown after fetch completes with no error */}
+          {hasQuery && !isFetching && !isTyping && !isError && results.length === 0 && (
             <p className="px-3 py-3 text-sm text-text-muted">
-              No users found for &ldquo;{trimmed}&rdquo;
+              No users found for &ldquo;{debounced}&rdquo;
             </p>
           )}
         </div>
