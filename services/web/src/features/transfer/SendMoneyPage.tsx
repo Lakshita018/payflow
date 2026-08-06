@@ -3,7 +3,9 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Avatar from '@/components/ui/Avatar';
 import Button from '@/components/ui/Button';
+import { UserSearchInput } from '@/components/common';
 import { transactionService, userService, walletService } from '@/services';
+import type { PublicProfile } from '@/types';
 
 // ── Icon helpers ──────────────────────────────────────────────────────────────
 
@@ -155,11 +157,9 @@ export function SendMoneyPage() {
   const location = useLocation();
   const prefillId: string = (location.state as { prefillPayflowId?: string } | null)?.prefillPayflowId ?? '';
 
-  // Recipient lookup
-  // Strip @payflow suffix when storing – we re-append on lookup
+  // Recipient state
   const stripSuffix = (v: string) => v.replace(/@payflow$/i, '').trim();
-  const [payflowIdInput, setPayflowIdInput] = useState(stripSuffix(prefillId));
-  const [lookupQuery, setLookupQuery] = useState(prefillId);
+  const [recipient, setRecipient] = useState<PublicProfile | null>(null);
   const [recipientConfirmed, setRecipientConfirmed] = useState(false);
 
   // Amount & note
@@ -178,14 +178,6 @@ export function SendMoneyPage() {
   // network retry / browser back-forward.
   const [idempotencyKey, setIdempotencyKey] = useState<string>(() => crypto.randomUUID());
 
-  // Recipient lookup query
-  const { data: recipient, isLoading: lookupLoading, isError: lookupError } = useQuery({
-    queryKey: ['recipient', lookupQuery],
-    queryFn: () => userService.lookupRecipient(lookupQuery),
-    enabled: Boolean(lookupQuery) && lookupQuery.length >= 3,
-    retry: false,
-  });
-
   // Favourites (to check if already favourite)
   const { data: favourites = [] } = useQuery({
     queryKey: ['favourites'],
@@ -200,12 +192,20 @@ export function SendMoneyPage() {
     staleTime: 60_000,
   });
 
-  // Auto-confirm recipient when prefilled from user profile page (already validated there)
+  // When prefillId is set (from user-profile page), pre-select that user immediately
   useEffect(() => {
-    if (prefillId && recipient && !recipientConfirmed) {
-      setRecipientConfirmed(true);
-    }
-  }, [prefillId, recipient, recipientConfirmed]);
+    if (!prefillId) return;
+    void userService.search(prefillId).then((results) => {
+      const match = results.find(
+        (u) => u.payflowId.replace(/@payflow$/i, '') === stripSuffix(prefillId),
+      );
+      if (match) {
+        setRecipient(match);
+        setRecipientConfirmed(true);
+      }
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefillId]);
 
   // Wallet balance
   const { data: wallet } = useQuery({
@@ -274,19 +274,6 @@ export function SendMoneyPage() {
     setRawAmount(next.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
   };
 
-  const buildFullId = (username: string) => {
-    const u = username.trim();
-    if (!u) return '';
-    return u.includes('@') ? u : `${u}@payflow`;
-  };
-
-  const handleLookup = () => {
-    const full = buildFullId(payflowIdInput);
-    if (!full) return;
-    setLookupQuery(full);
-    setRecipientConfirmed(false);
-  };
-
   const handleConfirmRecipient = () => {
     setRecipientConfirmed(true);
   };
@@ -309,21 +296,15 @@ export function SendMoneyPage() {
     // Rotate the idempotency key so the next transfer gets a fresh UUID.
     setIdempotencyKey(crypto.randomUUID());
 
-    // If we came from a user profile page, prefetch the now-stale profile data
-    // then navigate so the profile page renders with fresh data immediately
-    // (no skeleton flash, no stale totals).
     const returnId = prefillId || lastReceiverContactId;
     if (returnId) {
-      // Fire background refetches for both profile queries. They were already
-      // invalidated in onSuccess, so these calls hit the network right away.
       void queryClient.refetchQueries({ queryKey: ['user-relationship', returnId] });
       void queryClient.refetchQueries({ queryKey: ['user-profile', returnId] });
       void navigate(`/users/${encodeURIComponent(returnId)}`, { replace: true });
       return;
     }
     setSuccessData(null);
-    setPayflowIdInput('');
-    setLookupQuery('');
+    setRecipient(null);
     setRecipientConfirmed(false);
     setRawAmount('');
     setMessage('');
@@ -347,46 +328,22 @@ export function SendMoneyPage() {
               <span className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-600 text-xs font-bold text-white">1</span>
               <div>
                 <h3 className="text-base font-semibold text-text-primary">Recipient</h3>
-                <p className="text-xs text-text-secondary">Enter the PayFlow ID of the person you want to send money to</p>
+                <p className="text-xs text-text-secondary">Start typing a name, email or PayFlow ID to find someone</p>
               </div>
             </div>
 
-            <div className="flex gap-2">
-              {/* Split input: user types only the username; @payflow is a fixed suffix */}
-              <div className="flex flex-1 items-center overflow-hidden rounded-xl border border-border bg-surface-subtle px-4 py-2.5 text-sm transition-all focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/20">
-                <input
-                  type="text"
-                  value={payflowIdInput}
-                  onChange={(e) => {
-                    // Prevent the user from typing the suffix manually
-                    const raw = e.target.value.replace(/@payflow.*/i, '');
-                    setPayflowIdInput(raw);
-                    setRecipientConfirmed(false);
-                    if (!raw.trim()) setLookupQuery('');
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleLookup();
-                  }}
-                  placeholder="username"
-                  className="min-w-0 flex-1 bg-transparent text-text-primary placeholder:text-text-muted outline-none"
-                />
-                <span className="ml-0.5 shrink-0 select-none text-text-muted">@payflow</span>
-              </div>
-              <Button
-                variant="secondary"
-                onClick={handleLookup}
-                disabled={lookupLoading || !payflowIdInput.trim()}
-                className="rounded-xl px-4"
-              >
-                {lookupLoading ? 'Looking up…' : 'Look Up'}
-              </Button>
-            </div>
+            {/* Live-search input — always shown so user can change their selection */}
+            <UserSearchInput
+              placeholder="Search by name, email or PayFlow ID…"
+              onSelect={(user: PublicProfile) => {
+                setRecipient(user);
+                setRecipientConfirmed(false);
+              }}
+              recentContacts={recentContacts}
+            />
 
-            {lookupQuery && lookupError && (
-              <p className="mt-2 text-sm text-danger">No user found with PayFlow ID: {lookupQuery}</p>
-            )}
-
-            {recipient && !lookupError && (
+            {/* Selected recipient preview */}
+            {recipient !== null && (
               <div className="mt-3 flex items-center gap-3 rounded-xl border border-success/20 bg-success/5 px-4 py-3">
                 <Avatar name={recipient.displayName} size="md" className="bg-brand-100 text-brand-700" />
                 <div className="min-w-0 flex-1">
@@ -404,30 +361,6 @@ export function SendMoneyPage() {
                     </svg>
                   </span>
                 )}
-              </div>
-            )}
-
-            {/* Recent contacts shortcuts */}
-            {recentContacts.length > 0 && (
-              <div className="mt-4">
-                <p className="mb-2 text-xs font-medium text-text-muted uppercase tracking-wide">Recent</p>
-                <div className="flex flex-wrap gap-2">
-                  {recentContacts.slice(0, 5).map((c) => (
-                    <button
-                      key={c.payflowId}
-                      type="button"
-                      onClick={() => {
-                        setPayflowIdInput(stripSuffix(c.payflowId));
-                        setLookupQuery(c.payflowId);
-                        setRecipientConfirmed(false);
-                      }}
-                      className="flex items-center gap-1.5 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs font-medium text-text-secondary transition-colors hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700"
-                    >
-                      <Avatar name={c.displayName} size="xs" className="bg-brand-100 text-brand-700 h-5 w-5 text-[0.55rem]" />
-                      {c.displayName}
-                    </button>
-                  ))}
-                </div>
               </div>
             )}
           </section>
@@ -589,8 +522,7 @@ export function SendMoneyPage() {
                     key={contact.payflowId}
                     type="button"
                     onClick={() => {
-                      setPayflowIdInput(contact.payflowId);
-                      setLookupQuery(contact.payflowId);
+                      setRecipient(contact);
                       setRecipientConfirmed(false);
                     }}
                     className={[

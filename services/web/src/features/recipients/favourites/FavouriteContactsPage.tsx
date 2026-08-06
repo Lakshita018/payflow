@@ -1,8 +1,10 @@
 import { useState, useMemo, type SVGProps } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Avatar from '@/components/ui/Avatar';
 import Button from '@/components/ui/Button';
+import { UserSearchInput } from '@/components/common';
 import { userService } from '@/services';
+import type { PublicProfile } from '@/types';
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 
@@ -269,16 +271,8 @@ interface AddContactModalProps {
 
 function AddContactModal({ onClose, existingPayflowIds }: AddContactModalProps) {
   const queryClient = useQueryClient();
-  const [input, setInput] = useState('');
-  const [lookupQuery, setLookupQuery] = useState('');
+  const [selected, setSelected] = useState<PublicProfile | null>(null);
   const [error, setError] = useState('');
-
-  const { data: found, isLoading, isError } = useQuery({
-    queryKey: ['recipient', lookupQuery],
-    queryFn: () => userService.lookupRecipient(lookupQuery),
-    enabled: Boolean(lookupQuery),
-    retry: false,
-  });
 
   const addMutation = useMutation({
     mutationFn: (payflowId: string) => userService.addFavourite(payflowId),
@@ -291,23 +285,21 @@ function AddContactModal({ onClose, existingPayflowIds }: AddContactModalProps) 
     },
   });
 
-  const handleLookup = () => {
-    const trimmed = input.trim();
-    if (!trimmed) return;
+  const handleSelect = (user: PublicProfile) => {
     setError('');
-    setLookupQuery(trimmed);
+    setSelected(user);
   };
 
   const handleAdd = () => {
-    if (!found) return;
-    if (existingPayflowIds.includes(found.payflowId)) {
+    if (!selected) return;
+    if (existingPayflowIds.includes(selected.payflowId)) {
       setError('This contact is already in your favourites.');
       return;
     }
-    addMutation.mutate(found.payflowId);
+    addMutation.mutate(selected.payflowId);
   };
 
-  const isDuplicate = found && existingPayflowIds.includes(found.payflowId);
+  const isDuplicate = selected !== null && existingPayflowIds.includes(selected.payflowId);
 
   return (
     <div
@@ -329,45 +321,35 @@ function AddContactModal({ onClose, existingPayflowIds }: AddContactModalProps) 
           </button>
         </div>
 
-        <p className="mb-4 text-sm text-text-secondary">Enter a PayFlow ID to find and save a contact.</p>
+        <p className="mb-4 text-sm text-text-secondary">
+          Start typing a name, email or PayFlow ID to find a contact.
+        </p>
 
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => {
-              setInput(e.target.value);
-              setError('');
-              if (!e.target.value.trim()) setLookupQuery('');
-            }}
-            onKeyDown={(e) => { if (e.key === 'Enter') handleLookup(); }}
-            placeholder="e.g. priya1234@payflow"
-            className="flex-1 rounded-xl border border-border bg-surface-subtle px-4 py-2.5 text-sm text-text-primary placeholder:text-text-muted outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all"
-          />
-          <Button
-            variant="secondary"
-            onClick={handleLookup}
-            disabled={isLoading || !input.trim()}
-            className="rounded-xl px-4 shrink-0"
-          >
-            {isLoading ? 'Searching…' : 'Search'}
-          </Button>
-        </div>
+        {/* Live-search input */}
+        <UserSearchInput
+          placeholder="Search by name, email or PayFlow ID…"
+          onSelect={handleSelect}
+          autoFocus
+        />
 
-        {lookupQuery && isError && (
-          <p className="mt-2 text-sm text-danger">No user found with PayFlow ID: {lookupQuery}</p>
-        )}
-
-        {found && !isError && (
+        {/* Selected contact preview */}
+        {selected !== null && (
           <div className="mt-3 flex items-center gap-3 rounded-xl border border-success/20 bg-success/5 px-4 py-3">
-            <Avatar name={found.displayName} size="md" className="bg-brand-100 text-brand-700" />
+            <Avatar name={selected.displayName} size="md" className="bg-brand-100 text-brand-700" />
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-text-primary">{found.displayName}</p>
-              <p className="text-xs text-text-muted">{found.payflowId}</p>
+              <p className="text-sm font-semibold text-text-primary">{selected.displayName}</p>
+              <p className="text-xs text-text-muted">{selected.payflowId}</p>
             </div>
-            {isDuplicate && (
-              <span className="text-xs text-text-muted">Already added</span>
-            )}
+            {isDuplicate
+              ? <span className="shrink-0 text-xs text-text-muted">Already added</span>
+              : (
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-success text-white">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className="h-3.5 w-3.5">
+                    <path d="m5 13 4 4L19 7" />
+                  </svg>
+                </span>
+              )
+            }
           </div>
         )}
 
@@ -390,7 +372,7 @@ function AddContactModal({ onClose, existingPayflowIds }: AddContactModalProps) 
             variant="primary"
             onClick={handleAdd}
             className="flex-1 rounded-2xl"
-            disabled={!found || isError || isDuplicate || addMutation.isPending}
+            disabled={selected === null || isDuplicate || addMutation.isPending}
           >
             {addMutation.isPending ? 'Adding…' : 'Add Contact'}
           </Button>
