@@ -2,12 +2,14 @@
 // RequestMoneyPage — allows a user to request money from another PayFlow user.
 // Mirrors the SendMoneyPage UX: search → select → amount → note → review → send.
 // ---------------------------------------------------------------------------
-import { useState, useEffect, type SVGProps } from 'react';
+import { useState, useEffect, useMemo, type SVGProps } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Avatar from '@/components/ui/Avatar';
 import Button from '@/components/ui/Button';
+import { ShagunSuggestions } from '@/components/common';
 import { paymentRequestService, userService } from '@/services';
+import { getShagunWishes } from '@/utils';
 import { useToast } from '@/providers/ToastProvider';
 import { useDebounce } from '@/hooks';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -214,6 +216,7 @@ export function RequestMoneyPage() {
   const displayName = selectedUser?.displayName ?? selectedUser?.payflowId?.split('@')[0] ?? '';
   const amtNum = parseFloat(rawAmount.replace(/,/g, ''));
   const amtFormatted = isNaN(amtNum) ? '' : `₹${amtNum.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const shagunWishes = useMemo(() => getShagunWishes(rawAmount), [rawAmount]);
 
   const stepConfig = { search: 1, amount: 2, review: 3 };
 
@@ -408,6 +411,14 @@ export function RequestMoneyPage() {
                 {/* Note */}
                 <div className="mt-4">
                   <p className="mb-1.5 text-sm font-medium text-text-secondary">Note <span className="text-xs text-text-muted">(optional)</span></p>
+
+                  {/* Shagun wish suggestions — shown when amount is auspicious */}
+                  <ShagunSuggestions
+                    wishes={shagunWishes}
+                    hasUserText={note.length > 0}
+                    onSelect={(msg) => setNote(msg.slice(0, 200))}
+                  />
+
                   <input
                     type="text"
                     value={note}

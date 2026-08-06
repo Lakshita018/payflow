@@ -1,10 +1,11 @@
-import { useState, useEffect, type SVGProps } from 'react';
+import { useState, useEffect, useMemo, type SVGProps } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Avatar from '@/components/ui/Avatar';
 import Button from '@/components/ui/Button';
-import { UserSearchInput } from '@/components/common';
+import { UserSearchInput, ShagunSuggestions } from '@/components/common';
 import { transactionService, userService, walletService } from '@/services';
+import { getShagunWishes } from '@/utils';
 import type { PublicProfile } from '@/types';
 
 // ── Icon helpers ──────────────────────────────────────────────────────────────
@@ -263,6 +264,7 @@ export function SendMoneyPage() {
   const formattedAmount = numericAmount > 0
     ? '₹' + numericAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     : '₹0.00';
+  const shagunWishes = useMemo(() => getShagunWishes(rawAmount), [rawAmount]);
 
   const handleAmountChange = (value: string) => {
     setRawAmount(value.replace(/[^0-9.,]/g, ''));
@@ -419,6 +421,13 @@ export function SendMoneyPage() {
                 <p className="text-xs text-text-secondary">Add a note for the recipient</p>
               </div>
             </div>
+
+            {/* Shagun wish suggestions — shown when amount is auspicious */}
+            <ShagunSuggestions
+              wishes={shagunWishes}
+              hasUserText={message.length > 0}
+              onSelect={(msg) => setMessage(msg.slice(0, 50))}
+            />
 
             <div className="relative">
               <textarea
