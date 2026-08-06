@@ -190,6 +190,9 @@ export function TransactionDetailsPage() {
     queryFn: () => transactionService.getById(id!),
     enabled: Boolean(id),
     retry: false,
+    // Always fetch fresh data — this page is reached by clicking a notification,
+    // so we must never serve a stale cached copy.
+    staleTime: 0,
   });
 
   const transaction = useMemo(() => tx ? toRecord(tx) : undefined, [tx]);

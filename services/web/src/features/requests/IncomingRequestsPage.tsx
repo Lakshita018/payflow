@@ -182,6 +182,7 @@ export function IncomingRequestsPage() {
     onSuccess: () => {
       toast.success('Payment approved successfully!');
       void queryClient.invalidateQueries({ queryKey: ['payment-requests-incoming'] });
+      void queryClient.invalidateQueries({ queryKey: ['payment-requests-outgoing'] });
       void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
       void queryClient.invalidateQueries({ queryKey: ['wallet'] });
       void queryClient.invalidateQueries({ queryKey: ['transactions'] });

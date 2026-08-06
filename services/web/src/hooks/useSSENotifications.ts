@@ -3,9 +3,10 @@
 //
 // Responsibilities:
 //   • Establish SSE connection on mount (when authenticated)
-//   • Handle incoming notification messages
-//   • Update notification store and show toast for each type
-//   • Prevent duplicate notifications
+//   • On each incoming notification:
+//       – add it to the Zustand store (deduplication built-in)
+//       – show an appropriate toast (success / info / warning)
+//       – invalidate the React Query caches whose data is now stale
 //   • Reset singleton and cleanup on logout / unmount so re-login
 //     always gets a fresh connection
 // ---------------------------------------------------------------------------
@@ -13,6 +14,7 @@ import { useEffect, useCallback, useRef } from 'react';
 import { useAuthStore } from '@/store';
 import { useNotificationStore } from '@/store/notificationStore';
 import { useToast } from '@/providers/ToastProvider';
+import { queryClient } from '@/providers/QueryProvider';
 import {
   createSSEClient,
   resetSSEClient,
@@ -20,6 +22,46 @@ import {
   type NotificationMessage,
 } from '@/lib/sse-client';
 import type { NotificationItem } from '@/types';
+
+// ---------------------------------------------------------------------------
+// invalidateForNotification
+// Maps each notification type to the React Query keys that are now stale.
+// ---------------------------------------------------------------------------
+function invalidateForNotification(type: string): void {
+  switch (type) {
+    case 'MONEY_RECEIVED':
+      // Someone sent us money — balance, dashboard stats, and transaction list changed
+      void queryClient.invalidateQueries({ queryKey: ['wallet'] });
+      void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      void queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      break;
+
+    case 'MONEY_SENT':
+      // We sent money (or paid a request) — same set of caches
+      void queryClient.invalidateQueries({ queryKey: ['wallet'] });
+      void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      void queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      // Payment-request lists may also have changed status
+      void queryClient.invalidateQueries({ queryKey: ['payment-requests-incoming'] });
+      void queryClient.invalidateQueries({ queryKey: ['payment-requests-outgoing'] });
+      break;
+
+    case 'WALLET_TOPPED_UP':
+      // Our own top-up — balance and dashboard stats changed
+      void queryClient.invalidateQueries({ queryKey: ['wallet'] });
+      void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      void queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      break;
+
+    case 'PASSWORD_CHANGED':
+    case 'PROFILE_UPDATED':
+      // Auth data may have changed; nothing financial to refresh
+      break;
+
+    default:
+      break;
+  }
+}
 
 export function useSSENotifications(): void {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -45,13 +87,18 @@ export function useSSENotifications(): void {
   // Memoize the notification handler so the connect effect only re-runs
   // when the store actions or toast context itself changes (both stable).
   const handleNotification = useCallback((notification: NotificationMessage) => {
-    // Add to store (deduplication is inside addNotification)
+    // 1. Persist in store (deduplication is inside addNotification)
     addNotification(notification as NotificationItem);
 
-    // Refresh badge count from server to stay in sync
+    // 2. Refresh notification badge count
     void refreshUnreadCount();
 
-    // Show an appropriate toast based on notification type
+    // 3. Invalidate the relevant React Query caches so every visible page
+    //    (dashboard, transactions list, wallet balance, request pages)
+    //    automatically refetches with fresh data.
+    invalidateForNotification(notification.type);
+
+    // 4. Show an appropriate toast variant per notification type
     const message = `${notification.title}: ${notification.body}`;
     switch (notification.type) {
       case 'MONEY_RECEIVED':
