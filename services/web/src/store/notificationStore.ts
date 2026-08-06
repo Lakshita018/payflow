@@ -124,16 +124,12 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
 
   addNotification: (notification) => {
     set((state) => {
-      console.log('[STORE BEFORE]', state.notifications.length);
-      console.log('[ADDING]', notification.id);
       // Deduplicate by ID
       if (state.notifications.some((n) => n.id === notification.id)) return state;
-      const next = {
+      return {
         notifications: [notification, ...state.notifications],
         unreadCount: state.unreadCount + 1,
       };
-      console.log('[STORE AFTER]', next.notifications.length);
-      return next;
     });
   },
 

@@ -53,6 +53,12 @@ export function setAuthTokenGetter(getter: () => string | null): void {
   getAuthToken = getter;
 }
 
+// Read VITE_API_BASE_URL at module evaluation time so the SSE client
+// uses the same backend URL as the axios client in production.
+// Falls back to the Vite dev-proxy path ('/api/v1') for local development.
+const DEFAULT_BASE_URL =
+  ((import.meta.env.VITE_API_BASE_URL as string | undefined) ?? '').replace(/\/$/, '') + '/api/v1';
+
 export class SSEClient {
   private abortController: AbortController | null = null;
   private callback: NotificationCallback | null = null;
@@ -64,7 +70,7 @@ export class SSEClient {
   private isClosed = false;
   private baseURL: string;
 
-  constructor(baseURL: string = '/api/v1') {
+  constructor(baseURL: string = DEFAULT_BASE_URL) {
     this.baseURL = baseURL;
   }
 
@@ -150,7 +156,6 @@ export class SSEClient {
         if (done) break;
 
         const chunk = decoder.decode(value, { stream: true });
-        console.log('[RAW CHUNK]', JSON.stringify(chunk));
         buffer += chunk;
         const lines = buffer.split('\n');
         buffer = lines.pop() || '';
@@ -178,7 +183,6 @@ export class SSEClient {
       const dataStr = line.slice(6);
       try {
         const notification: NotificationMessage = JSON.parse(dataStr);
-        console.log('[PARSED EVENT]', notification);
         logger.info('Received SSE notification', { id: notification.id, type: notification.type });
         if (this.callback) {
           this.callback(notification);
@@ -236,7 +240,8 @@ export class SSEClient {
   }
 }
 
-// Singleton instance
+// Module-level singleton — one connection per browser context.
+// resetSSEClient() clears it so a fresh connection is made after logout/re-login.
 let sseClient: SSEClient | null = null;
 
 export function createSSEClient(baseURL?: string): SSEClient {
@@ -244,6 +249,13 @@ export function createSSEClient(baseURL?: string): SSEClient {
     sseClient = new SSEClient(baseURL);
   }
   return sseClient;
+}
+
+export function resetSSEClient(): void {
+  if (sseClient) {
+    sseClient.close();
+    sseClient = null;
+  }
 }
 
 export function getSSEClient(): SSEClient | null {

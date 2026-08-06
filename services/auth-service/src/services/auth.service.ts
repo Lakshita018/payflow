@@ -19,8 +19,7 @@ import bcrypt from 'bcrypt';
 import { UserRepository } from '../repositories/user.repository';
 import { User } from '../generated/prisma/client';
 import { WalletRepository } from '../repositories/wallet.repository';
-import { NotificationRepository } from '../repositories/notification.repository';
-import { NotificationType } from './notification.service';
+import { NotificationService, NotificationType } from './notification.service';
 import { ConflictError, InternalServerError, UnauthorizedError, NotFoundError, BadRequestError } from '../utils/errors';
 import { registerSchema, loginSchema, forgotPasswordSchema, resetPasswordSchema } from '../validators/auth.validator';
 import { changePasswordSchema, updateProfileSchema, updatePreferencesSchema } from '../validators/auth.validator';
@@ -147,7 +146,7 @@ export class AuthService {
   constructor(
     private readonly userRepository: UserRepository,
     private readonly walletRepository?: WalletRepository,
-    private readonly notificationRepository?: NotificationRepository,
+    private readonly notificationService?: NotificationService,
   ) {}
 
   // ── Register ──────────────────────────────────────────────────────────────
@@ -377,9 +376,9 @@ export class AuthService {
     //    does not leave the user with a new password but a still-valid token.
     await this.userRepository.clearPasswordResetToken(user.id);
 
-    // Fire-and-forget password-changed notification
-    if (this.notificationRepository) {
-      void this.notificationRepository.create({
+    // Fire-and-forget password-changed notification (via NotificationService so SSE push fires)
+    if (this.notificationService) {
+      void this.notificationService.create({
         userId: user.id,
         type:   NotificationType.PASSWORD_CHANGED,
         title:  'Password Changed',
@@ -425,9 +424,9 @@ export class AuthService {
       avatarUrl:   parsed.avatarUrl,
     }) as ProfileUserFields;
 
-    // Fire-and-forget PROFILE_UPDATED notification
-    if (this.notificationRepository) {
-      void this.notificationRepository.create({
+    // Fire-and-forget PROFILE_UPDATED notification (via NotificationService so SSE push fires)
+    if (this.notificationService) {
+      void this.notificationService.create({
         userId,
         type:  NotificationType.PROFILE_UPDATED,
         title: 'Profile Updated',
@@ -459,9 +458,9 @@ export class AuthService {
     const newHash = await bcrypt.hash(parsed.newPassword, config.BCRYPT_SALT_ROUNDS);
     await this.userRepository.updatePassword(user.id, newHash);
 
-    // Fire-and-forget PASSWORD_CHANGED notification
-    if (this.notificationRepository) {
-      void this.notificationRepository.create({
+    // Fire-and-forget PASSWORD_CHANGED notification (via NotificationService so SSE push fires)
+    if (this.notificationService) {
+      void this.notificationService.create({
         userId: user.id,
         type:   NotificationType.PASSWORD_CHANGED,
         title:  'Password Changed',

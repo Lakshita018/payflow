@@ -16,17 +16,39 @@ import type { NotificationItem } from '@/types';
 import { ROUTES } from '@/routes/paths';
 import { BellIcon } from './icons';
 
-// Maps notification title → the page to navigate to on click.
-// Titles that are NOT listed here carry a transaction refId → go to /transactions/:id.
-const REQUEST_TITLE_ROUTES: Record<string, string> = {
-  // Receiver (payer) sees incoming requests
-  'Payment Request':   ROUTES.INCOMING_REQUESTS,
-  // Requester sees outgoing requests
-  'Request Sent':      ROUTES.OUTGOING_REQUESTS,
-  'Request Declined':  ROUTES.OUTGOING_REQUESTS,
-  'Request Cancelled': ROUTES.OUTGOING_REQUESTS,
-  // 'Payment Received' and 'Payment Sent' both carry a real transaction refId → /transactions/:id
-};
+// ---------------------------------------------------------------------------
+// Navigation logic for notification clicks.
+//
+// Type × refId matrix:
+//   MONEY_RECEIVED + refId   → /transactions/:refId  (received a transfer or request payment)
+//   MONEY_SENT     + refId   → /transactions/:refId  (sent a transfer or paid a request)
+//   MONEY_SENT  (title="Payment Request") + refId → /requests/incoming (payer sees incoming request)
+//   MONEY_SENT  (title="Request Sent")    + refId → /requests/outgoing (requester confirmation)
+//   MONEY_SENT  (title="Request Declined/Cancelled") + refId → /requests/outgoing
+//   MONEY_RECEIVED (title="Request Cancelled") + refId → /requests/incoming (payer sees cancellation)
+//   WALLET_TOPPED_UP + refId → /transactions/:refId
+//   PASSWORD_CHANGED / PROFILE_UPDATED     → /settings / /profile (no refId)
+// ---------------------------------------------------------------------------
+function resolveNotificationRoute(n: NotificationItem): string | null {
+  // Payment-request notifications: navigate to the relevant requests page.
+  // These are identified by their title since refId is a payment-request ID,
+  // not a transaction ID.
+  if (n.title === 'Payment Request')    return ROUTES.INCOMING_REQUESTS;
+  if (n.title === 'Request Sent')       return ROUTES.OUTGOING_REQUESTS;
+  if (n.title === 'Request Declined')   return ROUTES.OUTGOING_REQUESTS;
+  if (n.title === 'Request Cancelled' && n.type === 'MONEY_SENT')     return ROUTES.OUTGOING_REQUESTS;
+  if (n.title === 'Request Cancelled' && n.type === 'MONEY_RECEIVED') return ROUTES.INCOMING_REQUESTS;
+
+  // Password / profile notifications → settings / profile page
+  if (n.type === 'PASSWORD_CHANGED') return ROUTES.SETTINGS;
+  if (n.type === 'PROFILE_UPDATED')  return ROUTES.PROFILE;
+
+  // Money transfers and wallet top-ups: go to the transaction detail page.
+  if (n.refId) return `${ROUTES.TRANSACTIONS}/${n.refId}`;
+
+  // No destination — notification has no actionable target
+  return null;
+}
 
 // ── Relative time helper ──────────────────────────────────────────────────────
 function relativeTime(iso: string): string {
@@ -107,17 +129,8 @@ function NotifRow({
 
   const handleClick = () => {
     if (!notification.isRead) onMarkRead(notification.id);
-    if (!notification.refId) return;
-
-    // If this title has an explicit request-page route, use it.
-    const requestRoute = REQUEST_TITLE_ROUTES[notification.title];
-    if (requestRoute !== undefined) {
-      void navigate(requestRoute);
-      return;
-    }
-
-    // All other notifications carry a real transaction refId → transaction detail page.
-    void navigate(`${ROUTES.TRANSACTIONS}/${notification.refId}`);
+    const dest = resolveNotificationRoute(notification);
+    if (dest) void navigate(dest);
   };
 
   return (

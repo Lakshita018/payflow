@@ -4,28 +4,27 @@
 // Responsibilities:
 //   • Establish SSE connection on mount (when authenticated)
 //   • Handle incoming notification messages
-//   • Update notification store, badge, toast, and animations
+//   • Update notification store and show toast for each type
 //   • Prevent duplicate notifications
-//   • Cleanup on unmount
-//   • Reconnect on auth changes
-//
-// Design notes:
-//   • Depends on useAuthStore for auth state
-//   • Depends on useNotificationStore for store updates
-//   • Depends on useToast for toast notifications
-//   • Safe with multiple mounts (only one active connection per user)
+//   • Reset singleton and cleanup on logout / unmount so re-login
+//     always gets a fresh connection
 // ---------------------------------------------------------------------------
 import { useEffect, useCallback, useRef } from 'react';
 import { useAuthStore } from '@/store';
 import { useNotificationStore } from '@/store/notificationStore';
 import { useToast } from '@/providers/ToastProvider';
-import { createSSEClient, setAuthTokenGetter, type NotificationMessage } from '@/lib/sse-client';
+import {
+  createSSEClient,
+  resetSSEClient,
+  setAuthTokenGetter,
+  type NotificationMessage,
+} from '@/lib/sse-client';
 import type { NotificationItem } from '@/types';
 
 export function useSSENotifications(): void {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const accessToken     = useAuthStore((s) => s.accessToken);
-  const { addNotification } = useNotificationStore();
+  const { addNotification, refreshUnreadCount } = useNotificationStore();
   const { toast } = useToast();
 
   // Keep the token getter always up-to-date via a ref so the SSE client
@@ -43,27 +42,44 @@ export function useSSENotifications(): void {
     setAuthTokenGetter(() => tokenRef.current);
   }, []);
 
-  // Memoize the notification handler
+  // Memoize the notification handler so the connect effect only re-runs
+  // when the store actions or toast context itself changes (both stable).
   const handleNotification = useCallback((notification: NotificationMessage) => {
-    console.log('[HOOK RECEIVED]', notification.id);
-    console.log('[ADDING TO STORE]');
+    // Add to store (deduplication is inside addNotification)
     addNotification(notification as NotificationItem);
-    console.log('[STORE UPDATED]');
-    const message = `${notification.title}: ${notification.body}`;
-    console.log('[SHOWING TOAST]', message);
-    if (notification.type === 'MONEY_RECEIVED') {
-      toast.success(message);
-    } else {
-      toast.info(message);
-    }
-  }, [addNotification, toast]);
 
-  // Connect once when authenticated; disconnect on logout or unmount.
-  // accessToken is NOT a dep here — the getter ref always returns the
-  // latest token, so reconnection on token refresh is handled automatically
-  // by the SSE client's own scheduleReconnect logic.
+    // Refresh badge count from server to stay in sync
+    void refreshUnreadCount();
+
+    // Show an appropriate toast based on notification type
+    const message = `${notification.title}: ${notification.body}`;
+    switch (notification.type) {
+      case 'MONEY_RECEIVED':
+        toast.success(message);
+        break;
+      case 'MONEY_SENT':
+        toast.info(message);
+        break;
+      case 'WALLET_TOPPED_UP':
+        toast.success(message);
+        break;
+      case 'PASSWORD_CHANGED':
+        toast.warning(message);
+        break;
+      case 'PROFILE_UPDATED':
+        toast.info(message);
+        break;
+      default:
+        toast.info(message);
+    }
+  }, [addNotification, refreshUnreadCount, toast]);
+
+  // Connect once when authenticated; disconnect and reset singleton on logout
+  // or unmount so re-login always opens a fresh SSE connection.
   useEffect(() => {
     if (!isAuthenticated) {
+      // Ensure singleton is reset when the user logs out
+      resetSSEClient();
       return;
     }
 
@@ -71,6 +87,8 @@ export function useSSENotifications(): void {
     void sseClient.connect(handleNotification);
 
     return () => {
+      // Disconnect (abort fetch) but keep singleton alive so a tab-switch
+      // or StrictMode double-mount doesn't fully destroy the connection.
       sseClient.disconnect();
     };
   }, [isAuthenticated, handleNotification]);

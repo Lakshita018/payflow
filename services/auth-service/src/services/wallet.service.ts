@@ -10,8 +10,7 @@
 import { Prisma } from '../generated/prisma/client';
 import { WalletRepository } from '../repositories/wallet.repository';
 import { TransactionRepository } from '../repositories/transaction.repository';
-import { NotificationRepository } from '../repositories/notification.repository';
-import { NotificationType } from './notification.service';
+import { NotificationService, NotificationType } from './notification.service';
 import { ConflictError, NotFoundError, UnprocessableEntityError } from '../utils/errors';
 import { creditSchema, debitSchema } from '../validators/wallet.validator';
 
@@ -34,7 +33,7 @@ export class WalletService {
   constructor(
     private readonly walletRepository: WalletRepository,
     private readonly transactionRepository?: TransactionRepository,
-    private readonly notificationRepository?: NotificationRepository,
+    private readonly notificationService?: NotificationService,
   ) {}
 
   // ── Serialise ─────────────────────────────────────────────────────────────
@@ -108,15 +107,12 @@ export class WalletService {
       topUpTransactionId = topUpTransaction.id;
     }
 
-    // Fire-and-forget wallet top-up notification
-    if (this.notificationRepository) {
-      void this.notificationRepository.create({
-        userId,
-        type:  NotificationType.WALLET_TOPPED_UP,
-        title: 'Wallet Topped Up',
-        body:  `₹${validated.toFixed(2)} has been added to your PayFlow wallet.`,
-        ...(topUpTransactionId !== undefined && { refId: topUpTransactionId }),
-      });
+    // Fire-and-forget wallet top-up notification (via NotificationService so SSE push fires)
+    if (this.notificationService) {
+      const input = topUpTransactionId !== undefined
+        ? { userId, type: NotificationType.WALLET_TOPPED_UP, title: 'Wallet Topped Up', body: `₹${validated.toFixed(2)} has been added to your PayFlow wallet.`, refId: topUpTransactionId }
+        : { userId, type: NotificationType.WALLET_TOPPED_UP, title: 'Wallet Topped Up', body: `₹${validated.toFixed(2)} has been added to your PayFlow wallet.` };
+      void this.notificationService.create(input);
     }
 
     return this.toResult(updated);
